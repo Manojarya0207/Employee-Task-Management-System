@@ -143,8 +143,8 @@ def init_admin_routes():
                                     'type': 'linear',
                                     'x': 0, 'y': 0, 'x2': 0, 'y2': 1,
                                     'colorStops': [
-                                        {'offset': 0, 'color': '#ff5e00'}, # StarAdmin Orange
-                                        {'offset': 1, 'color': '#ffae80'}  # StarAdmin Peach
+                                        {'offset': 0, 'color': '#14b8a6'},
+                                        {'offset': 1, 'color': '#2563eb'}
                                     ]
                                 },
                                 'borderRadius': [4, 4, 0, 0]
@@ -166,7 +166,7 @@ def init_admin_routes():
                             'type': 'pie',
                             'radius': ['40%', '70%'],
                             'avoidLabelOverlap': False,
-                            'itemStyle': {'borderRadius': 6, 'borderColor': '#1f2130', 'borderWidth': 2},
+                            'itemStyle': {'borderRadius': 6, 'borderColor': '#111827', 'borderWidth': 2},
                             'label': {'show': False},
                             'emphasis': {'label': {'show': True, 'fontSize': '14', 'fontWeight': 'bold', 'color': '#FFFFFF'}},
                             'data': [

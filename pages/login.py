@@ -11,9 +11,19 @@ def init_login_routes():
             ui.navigate.to('/admin' if role == 'admin' else '/employee')
             return
             
-        ui.colors(primary='#ff5e00', secondary='#1f2235', accent='#ff5e00')
+        ui.colors(primary='#0f766e', secondary='#111827', accent='#14b8a6')
         ui.add_head_html('<link rel="stylesheet" href="/static/css/custom.css">')
         ui.add_head_html('<link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">')
+        ui.add_head_html('''
+            <script>
+                window.addEventListener('click', (event) => {
+                    const button = event.target.closest('.btn-neon');
+                    if (!button || button.classList.contains('is-loading')) return;
+                    button.classList.add('is-loading');
+                    window.setTimeout(() => button.classList.remove('is-loading'), 900);
+                });
+            </script>
+        ''')
 
         # Centered container
         with ui.element('div').classes('w-full min-h-screen flex items-center justify-center p-4'):

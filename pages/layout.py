@@ -5,10 +5,20 @@ def render_layout(active_route: str):
     Renders the common sidebar layout and wraps page content.
     Returns the page container to append components to.
     """
-    # Set theme colors for NiceGUI/Quasar matching StarAdmin
-    ui.colors(primary='#ff5e00', secondary='#1f2235', accent='#ff5e00')
+    # Set theme colors for NiceGUI/Quasar matching the industrial UI system
+    ui.colors(primary='#0f766e', secondary='#111827', accent='#14b8a6')
     ui.add_head_html('<link rel="stylesheet" href="/static/css/custom.css">')
     ui.add_head_html('<link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">')
+    ui.add_head_html('''
+        <script>
+            window.addEventListener('click', (event) => {
+                const button = event.target.closest('.btn-neon');
+                if (!button || button.classList.contains('is-loading')) return;
+                button.classList.add('is-loading');
+                window.setTimeout(() => button.classList.remove('is-loading'), 900);
+            });
+        </script>
+    ''')
     
     user_name = app.storage.user.get('employee_name', 'User')
     user_role = app.storage.user.get('role', 'employee')
@@ -21,9 +31,9 @@ def render_layout(active_route: str):
             ui.label('TASKFLOW').classes('font-extrabold text-xl tracking-wider brand-title')
             
         # User Info Panel
-        with ui.element('div').classes('mb-6 p-4 rounded-xl bg-slate-50 border border-slate-100'):
-            ui.label(user_name).classes('font-semibold text-sm truncate')
-            ui.label(user_role.upper()).classes('text-xs text-primary font-bold tracking-wider mt-1')
+        with ui.element('div').classes('user-panel mb-6 p-4 rounded-xl bg-slate-50 border border-slate-100'):
+            ui.label(user_name).classes('user-name font-semibold text-sm truncate')
+            ui.label(user_role.upper()).classes('user-role text-xs text-primary font-bold tracking-wider mt-1')
             
         # Navigation Menu Items
         with ui.element('div').classes('sidebar-menu'):
