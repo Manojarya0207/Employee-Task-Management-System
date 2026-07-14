@@ -1,0 +1,33 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ---- Virtual environments ----
+venv/
+.venv/
+env/
+
+# ---- Environment / secrets ----
+.env
+.env.*
+!.env.example
+
+# ---- Databases (never commit application data) ----
+instance/*.db
+database/*.db
+*.sqlite
+*.sqlite3
+
+# ---- NiceGUI runtime session storage ----
+.nicegui/
+
+# ---- Logs ----
+logs/
+*.log
+
+# ---- OS / editor cruft ----
+.DS_Store
+.idea/
+.vscode/

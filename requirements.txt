@@ -1,6 +1,16 @@
-nicegui>=1.4.25
-FastAPI>=0.109.0
-SQLAlchemy>=2.0.0
-Werkzeug>=3.0.0
-openpyxl>=3.1.2
-reportlab>=4.0.0
+# --- Core application framework ---
+nicegui>=2.0,<4.0          # UI framework (built on FastAPI/Starlette/Uvicorn)
+fastapi>=0.109.0           # ASGI web framework underlying NiceGUI
+uvicorn[standard]>=0.27.0  # ASGI server used to run the app in production
+
+# --- Database ---
+SQLAlchemy>=2.0.0          # ORM
+psycopg2-binary>=2.9.9     # PostgreSQL driver (used when DATABASE_URL is set)
+
+# --- Security / config ---
+Werkzeug>=3.0.0            # scrypt password hashing helpers
+python-dotenv>=1.0.0       # load environment variables from a local .env file
+
+# --- Reporting / exports ---
+openpyxl>=3.1.2            # Excel (.xlsx) export
+reportlab>=4.0.0           # PDF export

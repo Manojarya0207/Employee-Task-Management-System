@@ -1,0 +1,38 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Pushing this file to GitHub lets Render provision the service automatically.
+services:
+  - type: web
+    name: taskflow
+    runtime: python
+    plan: free
+    # Install dependencies.
+    buildCommand: "pip install -r requirements.txt"
+    # NiceGUI is an ASGI app; it is launched with its own bundled Uvicorn server.
+    # It binds to the PORT that Render injects into the environment (see config.py).
+    startCommand: "python main.py"
+    autoDeploy: true          # redeploy automatically on every push to the branch
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      # A strong random secret is generated once and kept stable across deploys.
+      - key: STORAGE_SECRET
+        generateValue: true
+      - key: LOG_LEVEL
+        value: INFO
+
+      # -----------------------------------------------------------------------
+      # PERSISTENT DATABASE (recommended for production)
+      # -----------------------------------------------------------------------
+      # Render's free filesystem is EPHEMERAL: the local SQLite file is wiped on
+      # every deploy/restart. For data that must survive, uncomment the database
+      # below and this env var to switch to managed PostgreSQL — no code changes
+      # are required (config.py reads DATABASE_URL automatically).
+      #
+      # - key: DATABASE_URL
+      #   fromDatabase:
+      #     name: taskflow-db
+      #     property: connectionString
+
+# databases:
+#   - name: taskflow-db
+#     plan: free

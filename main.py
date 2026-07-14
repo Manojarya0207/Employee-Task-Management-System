@@ -3,7 +3,14 @@ from fastapi import Request
 from fastapi.responses import RedirectResponse
 from nicegui import app, ui
 
-from config import STORAGE_SECRET, DEFAULT_ADMIN_ID, DEFAULT_ADMIN_PASSWORD
+from config import (
+    STORAGE_SECRET,
+    DEFAULT_ADMIN_ID,
+    DEFAULT_ADMIN_PASSWORD,
+    HOST,
+    PORT,
+    IS_PRODUCTION,
+)
 from models import Base, engine, SessionLocal
 from models.employee import Employee
 from models.task import Task
@@ -15,18 +22,25 @@ from pages.admin import init_admin_routes
 from pages.employee import init_employee_routes
 from pages.reports import init_reports_routes
 
+from utils.logging_config import configure_logging
+from utils.error_pages import register_error_pages
+
 from datetime import date
+
+# Configure application-wide logging (console + rotating file).
+logger = configure_logging()
 
 # 1. Initialize Database Tables
 def init_db():
     Base.metadata.create_all(bind=engine)
-    
+    logger.info("Database tables verified/created.")
+
     # Seed default administrator account if database is empty
     db = SessionLocal()
     try:
         admin_user = db.query(Employee).filter(Employee.employee_id == DEFAULT_ADMIN_ID).first()
         if not admin_user:
-            print("Seeding database with default administrator account...")
+            logger.info("Seeding database with default administrator account...")
             default_admin = Employee(
                 employee_id=DEFAULT_ADMIN_ID,
                 employee_name="System Administrator",
@@ -39,9 +53,9 @@ def init_db():
             )
             db.add(default_admin)
             db.commit()
-            print("Database seeded successfully.")
+            logger.info("Database seeded successfully.")
     except Exception as e:
-        print(f"Error seeding database: {e}")
+        logger.error("Error seeding database: %s", e)
         db.rollback()
     finally:
         db.close()
@@ -82,6 +96,9 @@ init_db()
 # Add auth check middleware
 app.add_middleware(AuthMiddleware)
 
+# Register branded 403 / 404 / 500 error pages
+register_error_pages(app)
+
 # Add static file paths
 app.add_static_files('/static', 'static')
 
@@ -107,11 +124,14 @@ def logout_page():
     ui.navigate.to('/login')
 
 if __name__ in {"__main__", "__mp_main__"}:
-    # Standard local execution on port 8080
+    # Host/port/secret all come from the environment (see config.py) so the same
+    # command works locally and on Render, which supplies the PORT to bind to.
+    logger.info("Starting TaskFlow on %s:%s (production=%s)", HOST, PORT, IS_PRODUCTION)
     ui.run(
         title='TaskFlow - Task Management System',
         storage_secret=STORAGE_SECRET,
-        host='0.0.0.0',
-        port=8080,
-        show=False # Don't open browser automatically in server environments
+        host=HOST,
+        port=PORT,
+        reload=not IS_PRODUCTION,  # auto-reload during development only
+        show=False,  # never open a browser in server environments
     )
