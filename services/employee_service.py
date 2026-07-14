@@ -128,6 +128,30 @@ def toggle_employee_status(db: Session, updater_id: str, employee_id: str) -> tu
         db.rollback()
         return False, f"Database error: {str(e)}"
 
+def delete_employee(db: Session, admin_id: str, employee_id: str) -> tuple[bool, str]:
+    """Deletes an employee account and its related tasks/activity logs."""
+    employee = get_employee_by_id(db, employee_id)
+    if not employee:
+        return False, "Employee not found"
+
+    if employee_id == admin_id:
+        return False, "You cannot delete your own account!"
+
+    if employee.role == 'admin':
+        admin_count = db.query(Employee).filter(Employee.role == 'admin').count()
+        if admin_count <= 1:
+            return False, "You cannot delete the last administrator account"
+
+    try:
+        db.delete(employee)
+        db.commit()
+
+        log_activity(db, admin_id, f"Deleted employee: {employee_id}")
+        return True, "Employee deleted successfully"
+    except Exception as e:
+        db.rollback()
+        return False, f"Database error: {str(e)}"
+
 def reset_employee_password(db: Session, admin_id: str, employee_id: str, new_password: str) -> tuple[bool, str]:
     """Allows an administrator to reset an employee's password."""
     employee = get_employee_by_id(db, employee_id)

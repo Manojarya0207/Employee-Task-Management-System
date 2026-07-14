@@ -5,7 +5,8 @@ from models.task import Task
 from models.activity_log import ActivityLog
 from services.employee_service import (
     get_all_employees, search_employees, add_employee, 
-    update_employee, toggle_employee_status, reset_employee_password
+    update_employee, toggle_employee_status, reset_employee_password,
+    delete_employee
 )
 from services.auth_service import log_activity
 from pages.layout import render_layout
@@ -318,6 +319,9 @@ def init_admin_routes():
                     <q-btn flat round dense color="secondary" icon="vpn_key" @click="$parent.$emit('reset_pwd', props.row.employee_id)">
                         <q-tooltip class="bg-purple text-white">Reset Password</q-tooltip>
                     </q-btn>
+                    <q-btn flat round dense color="negative" icon="delete" @click="$parent.$emit('delete_emp', props.row)">
+                        <q-tooltip class="bg-red text-white">Delete Employee</q-tooltip>
+                    </q-btn>
                 </q-td>
             ''')
 
@@ -467,6 +471,39 @@ def init_admin_routes():
                 dialog.open()
                 
             table.on('reset_pwd', lambda msg: open_reset_pwd_modal(msg.args))
+
+            # DELETE EMPLOYEE DIALOG
+            def open_delete_modal(row_data):
+                emp_id = row_data['employee_id']
+                emp_name = row_data['employee_name']
+
+                with ui.dialog().classes('w-full max-w-md') as dialog, ui.card().classes('glass-card p-6 w-full'):
+                    ui.label('Delete Employee').classes('text-xl font-bold mb-2')
+                    ui.label(f"Delete {emp_name} ({emp_id})? This will remove the employee account and related task/activity records.").classes('text-gray-600 text-sm mb-4')
+
+                    def confirm_delete():
+                        d_db = SessionLocal()
+                        try:
+                            ok, msg = delete_employee(
+                                db=d_db,
+                                admin_id=app.storage.user.get('employee_id'),
+                                employee_id=emp_id
+                            )
+                            if ok:
+                                ui.notify(msg, type='positive')
+                                dialog.close()
+                                run_search()
+                            else:
+                                ui.notify(msg, type='negative')
+                        finally:
+                            d_db.close()
+
+                    with ui.row().classes('w-full justify-end mt-4 gap-2'):
+                        ui.button('Cancel', on_click=dialog.close).props('flat color=primary')
+                        ui.button('Delete Employee', icon='delete', on_click=confirm_delete).props('color=negative')
+                dialog.open()
+
+            table.on('delete_emp', lambda msg: open_delete_modal(msg.args))
 
 
     @ui.page('/admin/tasks')
