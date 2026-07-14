@@ -160,15 +160,25 @@ def init_admin_routes():
                     pie_options = {
                         'backgroundColor': 'transparent',
                         'tooltip': {'trigger': 'item', 'backgroundColor': '#1E293B', 'textStyle': {'color': '#FFF'}},
-                        'legend': {'orient': 'horizontal', 'bottom': '0', 'textStyle': {'color': '#94A3B8'}},
+                        'legend': {
+                            'orient': 'horizontal',
+                            'bottom': '18',
+                            'left': 'center',
+                            'itemGap': 30,
+                            'itemWidth': 18,
+                            'itemHeight': 10,
+                            'textStyle': {'color': '#64727f', 'fontSize': 13, 'padding': [0, 8, 0, 4]}
+                        },
                         'series': [{
                             'name': 'Tasks',
                             'type': 'pie',
-                            'radius': ['40%', '70%'],
+                            'radius': ['34%', '58%'],
+                            'center': ['50%', '42%'],
                             'avoidLabelOverlap': False,
-                            'itemStyle': {'borderRadius': 6, 'borderColor': '#111827', 'borderWidth': 2},
+                            'itemStyle': {'borderRadius': 6, 'borderColor': '#ffffff', 'borderWidth': 3},
                             'label': {'show': False},
-                            'emphasis': {'label': {'show': True, 'fontSize': '14', 'fontWeight': 'bold', 'color': '#FFFFFF'}},
+                            'labelLine': {'show': False},
+                            'emphasis': {'label': {'show': False}},
                             'data': [
                                 {'value': completed_today, 'name': 'Completed', 'itemStyle': {'color': '#20c997'}},
                                 {'value': wip_today, 'name': 'In Progress', 'itemStyle': {'color': '#8b5cf6'}},
@@ -178,7 +188,7 @@ def init_admin_routes():
                             ]
                         }]
                     }
-                    ui.echart(options=pie_options).classes('w-full h-64')
+                    ui.echart(options=pie_options).classes('w-full h-80')
 
             # 4. Recent Task Submissions
             with ui.element('div').classes('glass-card p-6 w-full'):
