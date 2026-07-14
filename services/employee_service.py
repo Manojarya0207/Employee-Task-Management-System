@@ -10,7 +10,7 @@ def get_employee_by_id(db: Session, employee_id: str) -> Employee | None:
 
 def get_all_employees(db: Session) -> list[Employee]:
     """Retrieves all employees in the system."""
-    return db.query(Employee).order_by(Employee.employee_id).all()
+    return db.query(Employee).filter(Employee.registration_status == 'approved').order_by(Employee.employee_id).all()
 
 def search_employees(db: Session, query_str: str) -> list[Employee]:
     """Searches employees by ID, Name, Phone, or Department."""
@@ -19,6 +19,7 @@ def search_employees(db: Session, query_str: str) -> list[Employee]:
         
     search_pattern = f"%{query_str}%"
     return db.query(Employee).filter(
+        Employee.registration_status == 'approved',
         or_(
             Employee.employee_id.like(search_pattern),
             Employee.employee_name.like(search_pattern),

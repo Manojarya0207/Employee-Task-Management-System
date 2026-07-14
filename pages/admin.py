@@ -4,11 +4,17 @@ from models.employee import Employee
 from models.task import Task
 from models.activity_log import ActivityLog
 from services.employee_service import (
-    get_all_employees, search_employees, add_employee, 
+    get_all_employees, search_employees, add_employee,
     update_employee, toggle_employee_status, reset_employee_password,
     delete_employee
 )
 from services.auth_service import log_activity
+from services.registration_service import (
+    get_all_registration_requests,
+    count_pending_requests,
+    approve_employee,
+    reject_employee,
+)
 from pages.layout import render_layout
 from datetime import date, datetime, timedelta
 from sqlalchemy import func
@@ -232,113 +238,285 @@ def init_admin_routes():
             ui.navigate.to('/login')
             return
 
-        db = SessionLocal()
+        # Fetch pending registration count for the tab badge
+        db_p = SessionLocal()
         try:
-            employees = get_all_employees(db)
-            rows = []
-            for emp in employees:
-                rows.append({
-                    'employee_id': emp.employee_id,
-                    'employee_name': emp.employee_name,
-                    'phone_number': emp.phone_number,
-                    'role': emp.role,
-                    'department': emp.department or 'N/A',
-                    'joining_date': emp.joining_date.strftime('%Y-%m-%d'),
-                    'status': emp.status
-                })
+            pending_count = count_pending_requests(db_p)
         finally:
-            db.close()
+            db_p.close()
 
         # Renders the main wrapping page layout
         with render_layout('/admin/employees'):
+
+            # Helper method to render a pending/rejected request card
+            def _render_request_card(emp, status):
+                initials = ''.join(p[0].upper() for p in emp.employee_name.split()[:2])
+                
+                with ui.element('div').classes('glass-card p-5 flex flex-col gap-3'):
+                    # Avatar + Name
+                    with ui.row().classes('items-center gap-3 mb-1'):
+                        with ui.element('div').classes(
+                            'w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg flex-shrink-0'
+                        ).style('background: linear-gradient(135deg, #0f766e, #2563eb)'):
+                            ui.label(initials)
+                        with ui.element('div').classes('flex-1 min-w-0'):
+                            ui.label(emp.employee_name).classes('font-bold text-base truncate')
+                            if status == 'pending':
+                                ui.html('<span class="badge-status badge-pending" style="font-size:0.7rem">⏳ Pending</span>')
+                            else:
+                                ui.html('<span class="badge-status badge-blocked" style="font-size:0.7rem">❌ Rejected</span>')
+                                
+                    # Info Fields
+                    with ui.element('div').classes('space-y-1 text-sm'):
+                        with ui.row().classes('items-center gap-2'):
+                            ui.element('i').classes('ri-id-card-line text-primary text-base')
+                            ui.label('Employee ID:').classes('text-gray-500 text-xs')
+                            ui.label(emp.employee_id).classes('font-mono font-semibold text-primary')
+                        with ui.row().classes('items-center gap-2'):
+                            ui.element('i').classes('ri-phone-line text-primary text-base')
+                            ui.label('Phone:').classes('text-gray-500 text-xs')
+                            ui.label(emp.phone_number).classes('font-medium')
+                        with ui.row().classes('items-center gap-2'):
+                            ui.element('i').classes('ri-calendar-line text-primary text-base')
+                            ui.label('Registered:').classes('text-gray-500 text-xs')
+                            reg_date = emp.created_at.strftime('%d %b %Y, %I:%M %p') if emp.created_at else 'Unknown'
+                            ui.label(reg_date).classes('text-gray-700 text-xs')
+                        if status == 'rejected':
+                            if emp.rejected_at:
+                                with ui.row().classes('items-center gap-2'):
+                                    ui.element('i').classes('ri-close-line text-red-500 text-base')
+                                    ui.label('Rejected:').classes('text-gray-500 text-xs')
+                                    ui.label(emp.rejected_at.strftime('%d %b %Y')).classes('text-red-500 text-xs font-medium')
+                            if emp.rejection_reason:
+                                with ui.element('div').classes('bg-red-50 border border-red-100 rounded-lg p-2 mt-1 w-full'):
+                                    ui.label('Reason:').classes('text-xs text-red-500 font-semibold')
+                                    ui.label(emp.rejection_reason).classes('text-xs text-red-700')
+                                    
+                    # Action buttons
+                    if status == 'pending':
+                        _emp_id = emp.employee_id
+                        _emp_name = emp.employee_name
+                        with ui.row().classes('gap-2 mt-2 pt-3 border-t border-slate-100 w-full'):
+                            def do_approve(eid=_emp_id):
+                                a_db = SessionLocal()
+                                try:
+                                    ok, msg = approve_employee(a_db, admin_id=app.storage.user.get('employee_id'), employee_id=eid)
+                                    ui.notify(msg, type='positive' if ok else 'negative')
+                                    if ok:
+                                        ui.navigate.to('/admin/employees')
+                                finally:
+                                    a_db.close()
+                            ui.button('Approve', icon='check_circle', on_click=lambda eid=_emp_id: do_approve(eid))\
+                                .classes('flex-1 text-sm')\
+                                .props('color=positive unelevated')
+                                
+                            def do_reject_dialog(eid=_emp_id, ename=_emp_name):
+                                with ui.dialog() as reject_dlg, ui.card().classes('glass-card p-6 w-96'):
+                                    ui.label(f'Reject: {ename}').classes('text-lg font-bold mb-2')
+                                    ui.label('Are you sure you want to reject this registration?').classes('text-gray-500 text-sm mb-4')
+                                    reason_input = ui.input(label='Reason for rejection (optional)').classes('w-full mb-4').props('outlined color=negative')
+                                    def confirm_reject(rid=eid):
+                                        r_db = SessionLocal()
+                                        try:
+                                            ok, msg = reject_employee(r_db, admin_id=app.storage.user.get('employee_id'), employee_id=rid, reason=reason_input.value)
+                                            ui.notify(msg, type='positive' if ok else 'negative')
+                                            if ok:
+                                                reject_dlg.close()
+                                                ui.navigate.to('/admin/employees')
+                                        finally:
+                                            r_db.close()
+                                    with ui.row().classes('w-full justify-end gap-2'):
+                                        ui.button('Cancel', on_click=reject_dlg.close).props('flat color=primary')
+                                        ui.button('Reject', icon='cancel', on_click=lambda rid=eid: confirm_reject(rid)).props('color=negative unelevated')
+                                reject_dlg.open()
+                            ui.button('Reject', icon='cancel', on_click=lambda eid=_emp_id, ename=_emp_name: do_reject_dialog(eid, ename))\
+                                .classes('flex-1 text-sm')\
+                                .props('color=negative unelevated')
+                    elif status == 'rejected':
+                        _emp_id = emp.employee_id
+                        with ui.row().classes('gap-2 mt-2 pt-3 border-t border-slate-100 w-full justify-end'):
+                            def do_reaccept(eid=_emp_id):
+                                r_db = SessionLocal()
+                                try:
+                                    ok, msg = approve_employee(r_db, admin_id=app.storage.user.get('employee_id'), employee_id=eid)
+                                    ui.notify(msg, type='positive' if ok else 'negative')
+                                    if ok:
+                                        ui.navigate.to('/admin/employees')
+                                finally:
+                                    r_db.close()
+                            ui.button('reAccept', icon='check_circle', on_click=lambda eid=_emp_id: do_reaccept(eid))\
+                                .classes('text-xs px-3 py-1')\
+                                .props('color=positive flat dense')
             
             # Header
             with ui.row().classes('w-full items-center justify-between mb-8'):
                 with ui.element('div'):
-                    ui.label('Employee Registry').classes('text-3xl font-bold tracking-tight')
-                    ui.label('Manage staff credentials, department allocations, and access permissions').classes('text-gray-500 text-sm')
-                
-                ui.button('Add New Employee', icon='person_add', on_click=lambda: open_add_modal()).classes('btn-neon')
+                    ui.label('Employee Registry & Requests').classes('text-3xl font-bold tracking-tight')
+                    ui.label('Manage staff credentials, department allocations, and registration requests').classes('text-gray-500 text-sm')
 
-            # Search bar
-            with ui.row().classes('w-full mb-6 items-center'):
-                search_input = ui.input(placeholder='Search by ID, Name, Phone or Department...').classes('w-96').props('outlined dense color=primary')
+            # Tabs Strip
+            with ui.tabs().classes('w-full mb-6 border-b border-slate-200') as tabs:
+                active_tab = ui.tab('active', label='Active Registry').props('icon=group')
+                pending_label = f'Pending Requests ({pending_count})' if pending_count > 0 else 'Pending Requests'
+                pending_tab = ui.tab('pending', label=pending_label).props('icon=pending_actions')
+                rejected_tab = ui.tab('rejected', label='Rejected Requests').props('icon=cancel')
+
+            stored_tab = app.storage.user.get('admin_employees_tab', 'active')
+            tabs.value = stored_tab
+            tabs.on_value_change(lambda e: app.storage.user.update(admin_employees_tab=e.value))
+
+            with ui.tab_panels(tabs, value=stored_tab).classes('w-full bg-transparent'):
                 
-                def run_search():
-                    q = search_input.value
-                    s_db = SessionLocal()
+                # ── Panel 1: Active Registry ─────────────────────────────────
+                with ui.tab_panel('active').classes('p-0 bg-transparent'):
+                    # Search bar & Add Button
+                    with ui.row().classes('w-full mb-6 items-center justify-between'):
+                        with ui.row().classes('items-center gap-3'):
+                            search_input = ui.input(placeholder='Search by ID, Name, Phone or Department...').classes('w-96').props('outlined dense color=primary')
+                            
+                            def run_search():
+                                q = search_input.value
+                                s_db = SessionLocal()
+                                try:
+                                    res = search_employees(s_db, q)
+                                    table.rows = [{
+                                        'employee_id': emp.employee_id,
+                                        'employee_name': emp.employee_name,
+                                        'phone_number': emp.phone_number,
+                                        'role': emp.role,
+                                        'department': emp.department or 'N/A',
+                                        'joining_date': emp.joining_date.strftime('%Y-%m-%d') if emp.joining_date else 'N/A',
+                                        'status': emp.status
+                                    } for emp in res]
+                                finally:
+                                    s_db.close()
+                                    
+                            search_input.on('change', run_search)
+                            ui.button('Search', icon='search', on_click=run_search).props('flat color=primary')
+                        
+                        ui.button('Add New Employee', icon='person_add', on_click=lambda: open_add_modal()).classes('btn-neon')
+
+                    # 3. Employee Grid Table
+                    columns = [
+                        {'name': 'employee_id', 'label': 'Employee ID', 'field': 'employee_id', 'required': True, 'align': 'left', 'sortable': True},
+                        {'name': 'employee_name', 'label': 'Name', 'field': 'employee_name', 'align': 'left', 'sortable': True},
+                        {'name': 'phone_number', 'label': 'Phone Number', 'field': 'phone_number', 'align': 'left'},
+                        {'name': 'role', 'label': 'Role', 'field': 'role', 'align': 'center', 'sortable': True},
+                        {'name': 'department', 'label': 'Department', 'field': 'department', 'align': 'left', 'sortable': True},
+                        {'name': 'joining_date', 'label': 'Joining Date', 'field': 'joining_date', 'align': 'center', 'sortable': True},
+                        {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center'},
+                        {'name': 'actions', 'label': 'Actions', 'field': 'actions', 'align': 'center'}
+                    ]
+
+                    # Load initial rows for approved/active employees
+                    db = SessionLocal()
                     try:
-                        res = search_employees(s_db, q)
-                        table.rows = [{
+                        employees = get_all_employees(db)
+                        rows = [{
                             'employee_id': emp.employee_id,
                             'employee_name': emp.employee_name,
                             'phone_number': emp.phone_number,
                             'role': emp.role,
                             'department': emp.department or 'N/A',
-                            'joining_date': emp.joining_date.strftime('%Y-%m-%d'),
+                            'joining_date': emp.joining_date.strftime('%Y-%m-%d') if emp.joining_date else 'N/A',
                             'status': emp.status
-                        } for emp in res]
+                        } for emp in employees]
                     finally:
-                        s_db.close()
-                        
-                search_input.on('change', run_search)
-                ui.button('Search', icon='search', on_click=run_search).props('flat color=primary')
+                        db.close()
 
-            # 3. Employee Grid Table
-            columns = [
-                {'name': 'employee_id', 'label': 'Employee ID', 'field': 'employee_id', 'required': True, 'align': 'left', 'sortable': True},
-                {'name': 'employee_name', 'label': 'Name', 'field': 'employee_name', 'align': 'left', 'sortable': True},
-                {'name': 'phone_number', 'label': 'Phone Number', 'field': 'phone_number', 'align': 'left'},
-                {'name': 'role', 'label': 'Role', 'field': 'role', 'align': 'center', 'sortable': True},
-                {'name': 'department', 'label': 'Department', 'field': 'department', 'align': 'left', 'sortable': True},
-                {'name': 'joining_date', 'label': 'Joining Date', 'field': 'joining_date', 'align': 'center', 'sortable': True},
-                {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center'},
-                {'name': 'actions', 'label': 'Actions', 'field': 'actions', 'align': 'center'}
-            ]
-
-            table = ui.table(columns=columns, rows=rows, row_key='employee_id').classes('w-full glass-card p-4').props('flat hide-bottom')
-            
-            # Custom status column renderer using slot APIs
-            table.add_slot('body-cell-status', '''
-                <q-td :props="props">
-                    <span :class="props.value === 'active' ? 'badge-status badge-completed' : 'badge-status badge-blocked'">
-                        {{ props.value }}
-                    </span>
-                </q-td>
-            ''')
-            
-            # Custom action column renderer
-            table.add_slot('body-cell-actions', '''
-                <q-td :props="props">
-                    <q-btn flat round dense color="primary" icon="edit" @click="$parent.$emit('edit_emp', props.row)">
-                        <q-tooltip class="bg-indigo text-white">Edit Employee</q-tooltip>
-                    </q-btn>
-                    <q-btn flat round dense :color="props.row.status === 'active' ? 'warning' : 'positive'" icon="power_settings_new" @click="$parent.$emit('toggle_emp', props.row.employee_id)">
-                        <q-tooltip class="bg-amber text-white">Toggle Active/Inactive</q-tooltip>
-                    </q-btn>
-                    <q-btn flat round dense color="secondary" icon="vpn_key" @click="$parent.$emit('reset_pwd', props.row.employee_id)">
-                        <q-tooltip class="bg-purple text-white">Reset Password</q-tooltip>
-                    </q-btn>
-                    <q-btn flat round dense color="negative" icon="delete" @click="$parent.$emit('delete_emp', props.row)">
-                        <q-tooltip class="bg-red text-white">Delete Employee</q-tooltip>
-                    </q-btn>
-                </q-td>
-            ''')
-
-            # Listen to Table Events
-            def handle_toggle(emp_id):
-                t_db = SessionLocal()
-                try:
-                    ok, msg = toggle_employee_status(t_db, app.storage.user.get('employee_id'), emp_id)
-                    if ok:
-                        ui.notify(msg, type='positive')
-                        run_search() # Reload table
-                    else:
-                        ui.notify(msg, type='negative')
-                finally:
-                    t_db.close()
+                    table = ui.table(columns=columns, rows=rows, row_key='employee_id').classes('w-full glass-card p-4').props('flat hide-bottom')
                     
-            table.on('toggle_emp', lambda msg: handle_toggle(msg.args))
+                    # Custom status column renderer using slot APIs
+                    table.add_slot('body-cell-status', '''
+                        <q-td :props="props">
+                            <span :class="props.value === 'active' ? 'badge-status badge-completed' : 'badge-status badge-blocked'">
+                                {{ props.value }}
+                            </span>
+                        </q-td>
+                    ''')
+            
+                    # Custom action column renderer
+                    table.add_slot('body-cell-actions', '''
+                        <q-td :props="props">
+                            <q-btn flat round dense color="primary" icon="edit" @click="$parent.$emit('edit_emp', props.row)">
+                                <q-tooltip class="bg-indigo text-white">Edit Employee</q-tooltip>
+                            </q-btn>
+                            <q-btn flat round dense :color="props.row.status === 'active' ? 'warning' : 'positive'" icon="power_settings_new" @click="$parent.$emit('toggle_emp', props.row.employee_id)">
+                                <q-tooltip class="bg-amber text-white">Toggle Active/Inactive</q-tooltip>
+                            </q-btn>
+                            <q-btn flat round dense color="secondary" icon="vpn_key" @click="$parent.$emit('reset_pwd', props.row.employee_id)">
+                                <q-tooltip class="bg-purple text-white">Reset Password</q-tooltip>
+                            </q-btn>
+                            <q-btn flat round dense color="negative" icon="delete" @click="$parent.$emit('delete_emp', props.row)">
+                                <q-tooltip class="bg-red text-white">Delete Employee</q-tooltip>
+                            </q-btn>
+                        </q-td>
+                    ''')
+
+                    # Listen to Table Events
+                    def handle_toggle(emp_id):
+                        t_db = SessionLocal()
+                        try:
+                            ok, msg = toggle_employee_status(t_db, app.storage.user.get('employee_id'), emp_id)
+                            if ok:
+                                ui.notify(msg, type='positive')
+                                run_search() # Reload table
+                            else:
+                                ui.notify(msg, type='negative')
+                        finally:
+                            t_db.close()
+                            
+                    table.on('toggle_emp', lambda msg: handle_toggle(msg.args))
+
+                # ── Panel 2: Pending Requests ────────────────────────────────
+                with ui.tab_panel('pending').classes('p-0 bg-transparent'):
+                    pending_container = ui.element('div').classes('w-full')
+                    
+                    def render_pending():
+                        pending_container.clear()
+                        db_p = SessionLocal()
+                        try:
+                            employees_pending = get_all_registration_requests(db_p, status_filter='pending')
+                        finally:
+                            db_p.close()
+                            
+                        with pending_container:
+                            if not employees_pending:
+                                with ui.element('div').classes('glass-card p-12 text-center w-full'):
+                                    ui.element('i').classes('ri-inbox-line text-6xl text-gray-300 mb-4')
+                                    ui.label('No pending requests found.').classes('text-gray-400 text-lg')
+                                return
+                                
+                            with ui.element('div').classes('grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 w-full'):
+                                for emp in employees_pending:
+                                    _render_request_card(emp, 'pending')
+                    
+                    render_pending()
+
+                # ── Panel 3: Rejected Requests ───────────────────────────────
+                with ui.tab_panel('rejected').classes('p-0 bg-transparent'):
+                    rejected_container = ui.element('div').classes('w-full')
+                    
+                    def render_rejected():
+                        rejected_container.clear()
+                        db_r = SessionLocal()
+                        try:
+                            employees_rejected = get_all_registration_requests(db_r, status_filter='rejected')
+                        finally:
+                            db_r.close()
+                            
+                        with rejected_container:
+                            if not employees_rejected:
+                                with ui.element('div').classes('glass-card p-12 text-center w-full'):
+                                    ui.element('i').classes('ri-inbox-line text-6xl text-gray-300 mb-4')
+                                    ui.label('No rejected requests found.').classes('text-gray-400 text-lg')
+                                return
+                                
+                            with ui.element('div').classes('grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 w-full'):
+                                for emp in employees_rejected:
+                                    _render_request_card(emp, 'rejected')
+                                    
+                    render_rejected()
 
             # ADD DIALOG MODAL
             def open_add_modal():
@@ -666,3 +844,6 @@ def init_admin_routes():
                     </span>
                 </q-td>
             ''')
+
+
+

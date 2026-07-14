@@ -25,21 +25,35 @@ def log_activity(db: Session, employee_id: str, action: str):
 def authenticate_user(db: Session, employee_id: str, password: str) -> tuple[bool, Employee | None, str]:
     """
     Validates employee_id and password.
+
+    Login is blocked until registration_status == 'approved'.
     Returns (success, Employee_object or None, error_message).
     """
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
-        return False, None, "Invalid Employee ID"
-    
+        return False, None, "Invalid Employee ID or Password."
+
+    # --- Registration approval gate ---
+    reg_status = getattr(employee, 'registration_status', 'approved')  # safe default for legacy rows
+    if reg_status == 'pending':
+        return False, None, "Your account is waiting for administrator approval."
+    if reg_status == 'rejected':
+        reason = getattr(employee, 'rejection_reason', None)
+        base_msg = "Your registration request has been rejected. Please contact the administrator."
+        return False, None, f"{base_msg}\nReason: {reason}" if reason else base_msg
+
+    # --- Account active check ---
     if employee.status != 'active':
-        return False, None, "Account is disabled. Please contact the administrator."
-        
+        return False, None, "Your account has been disabled. Please contact the administrator."
+
+    # --- Password verification ---
     if not check_password(employee.password_hash, password):
-        return False, None, "Invalid Password"
-        
+        return False, None, "Invalid Employee ID or Password."
+
     # Log successful login
     log_activity(db, employee_id, "User logged in")
     return True, employee, "Success"
+
 
 def change_user_password(db: Session, employee_id: str, old_password: str, new_password: str) -> tuple[bool, str]:
     """
