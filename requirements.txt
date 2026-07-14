@@ -1,0 +1,6 @@
+nicegui>=1.4.25
+FastAPI>=0.109.0
+SQLAlchemy>=2.0.0
+Werkzeug>=3.0.0
+openpyxl>=3.1.2
+reportlab>=4.0.0

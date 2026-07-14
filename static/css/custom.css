@@ -1,0 +1,292 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+:root {
+    --primary: #ff5e00; /* StarAdmin Orange Accent */
+    --primary-hover: #e65500;
+    --primary-accent: #ff5e00;
+    --bg-light: #ffffff; /* Pure white background */
+    --card-bg: #FFFFFF; /* Pure White Card */
+    --border-color: #eef2f6; /* Subtle border */
+    --text-main: #1f2235; /* Dark navy text */
+    --text-muted: #8d9096; /* Slate gray muted text */
+    --sidebar-bg: #FFFFFF; /* Pure White sidebar */
+    --sidebar-width: 280px;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--bg-light);
+    color: var(--text-main);
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+}
+
+/* Premium Card Panels */
+.glass-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+    border-color: #CBD5E1;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6, .brand-title {
+    font-family: 'Outfit', sans-serif;
+    color: var(--text-main);
+    letter-spacing: -0.02em;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+}
+
+/* NiceGUI Layout Overrides */
+.nicegui-content {
+    padding: 0 !important;
+}
+
+/* Sidebar Navigation */
+.sidebar {
+    width: var(--sidebar-width);
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border-color);
+    padding: 24px 16px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 8px;
+    margin-bottom: 32px;
+}
+
+.sidebar-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-grow: 1;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.menu-item:hover, .menu-item.active {
+    color: var(--primary-accent) !important;
+    background: #ffece2 !important;
+    border-left: none !important;
+}
+
+.menu-item.active i {
+    color: var(--primary-accent) !important;
+}
+
+/* Main Workspace Layout */
+.main-wrapper {
+    margin-left: var(--sidebar-width);
+    padding: 40px;
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+@media (max-width: 992px) {
+    .sidebar {
+        width: 80px;
+        padding: 20px 8px;
+    }
+    .sidebar-brand span, .menu-item span {
+        display: none;
+    }
+    .main-wrapper {
+        margin-left: 80px;
+        padding: 20px;
+    }
+}
+
+/* Dashboard Metric Cards */
+.metric-card {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Quasar Component Theme Overrides for Light Mode */
+.q-field__native, .q-field__prefix, .q-field__suffix, .q-field__input {
+    color: var(--text-main) !important;
+}
+
+.q-field__label {
+    color: var(--text-muted) !important;
+}
+
+.q-table {
+    background: transparent !important;
+    color: var(--text-main) !important;
+}
+
+.q-table th {
+    font-weight: 600 !important;
+    color: var(--text-main) !important;
+    background: #f8f9fa !important;
+    border-bottom: 1px solid #eef2f6 !important;
+}
+
+.q-table td {
+    border-bottom: 1px solid #F1F5F9 !important;
+}
+
+.q-table__card {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.q-table tr:hover {
+    background: #F8FAFC !important;
+}
+
+/* Status Badges */
+.badge-status {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    display: inline-block;
+}
+
+.badge-completed {
+    background: #e2f6ed !important;
+    color: #00c689 !important;
+    border: none !important;
+}
+
+.badge-wip {
+    background: #e0e7ff !important;
+    color: #3f51b5 !important;
+    border: none !important;
+}
+
+.badge-pending {
+    background: #feedd8 !important;
+    color: #ff5e00 !important;
+    border: none !important;
+}
+
+.badge-blocked {
+    background: #fee2e2 !important;
+    color: #e53935 !important;
+    border: none !important;
+}
+
+.badge-hold {
+    background: #fffbeb !important;
+    color: #d97706 !important;
+    border: none !important;
+}
+
+/* FullCalendar styling override */
+.fc {
+    font-family: 'Inter', sans-serif !important;
+}
+
+.fc-theme-standard td, .fc-theme-standard th {
+    border: 1px solid #E2E8F0 !important;
+}
+
+.fc-daygrid-day:hover {
+    background: #F8FAFC !important;
+}
+
+.fc-col-header-cell {
+    background: #F1F5F9 !important;
+    padding: 10px 0 !important;
+    color: var(--text-main) !important;
+}
+
+.fc-daygrid-day-number {
+    color: var(--text-main) !important;
+    text-decoration: none !important;
+}
+
+/* Nice Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animated-fade {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Neon buttons converted to Sleek Solid Corporate buttons */
+.btn-neon {
+    background: #ff5e00 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 6px -1px rgba(255, 94, 0, 0.15) !important;
+    transition: all 0.2s ease !important;
+}
+
+.btn-neon:hover {
+    background: #e65500 !important;
+    box-shadow: 0 10px 15px -3px rgba(255, 94, 0, 0.25) !important;
+    transform: translateY(-1px);
+}
+
+/* Premium Dark Accent Panel Card style */
+.dark-card {
+    background: #1f2130 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.15);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark-card:hover {
+    box-shadow: 0 10px 25px 0 rgba(0, 0, 0, 0.25);
+    transform: translateY(-1px);
+}
+
+.dark-card h1, .dark-card h2, .dark-card h3, .dark-card h4, .dark-card h5, .dark-card h6, .dark-card .brand-title, .dark-card label {
+    color: #ffffff !important;
+}
