@@ -350,14 +350,16 @@ def init_admin_routes():
                     e_phone = ui.input('Phone Number').classes('w-full mb-3').props('outlined color=primary')
                     e_dept = ui.input('Department (Optional)').classes('w-full mb-3').props('outlined color=primary')
                     e_role = ui.select({'employee': 'Employee', 'admin': 'Administrator'}, value='employee').classes('w-full mb-3').props('outlined')
-                    e_join = ui.input('Joining Date (YYYY-MM-DD)', value=date.today().strftime('%Y-%m-%d')).classes('w-full mb-4').props('outlined color=primary')
-                    
-                    # Password is automatically generated as ID + 'Pass'
-                    ui.label("Temporary Password: Set same as Employee ID (forces login)").classes('text-gray-500 text-xs mb-4')
+                    e_join = ui.input('Joining Date (YYYY-MM-DD)', value=date.today().strftime('%Y-%m-%d')).classes('w-full mb-3').props('outlined color=primary')
+                    e_password = ui.input('Password').classes('w-full mb-3').props('outlined color=primary type=password')
+                    e_confirm_password = ui.input('Confirm Password').classes('w-full mb-4').props('outlined color=primary type=password')
 
                     def save():
-                        if not e_id.value or not e_name.value or not e_phone.value:
-                            ui.notify('Please fill all required fields', type='warning')
+                        if not e_id.value or not e_name.value or not e_phone.value or not e_password.value or not e_confirm_password.value:
+                            ui.notify('Please fill all required fields including Password', type='warning')
+                            return
+                        if e_password.value != e_confirm_password.value:
+                            ui.notify('Passwords do not match', type='negative')
                             return
                             
                         # Parse Date
@@ -375,7 +377,7 @@ def init_admin_routes():
                                 employee_id=e_id.value,
                                 employee_name=e_name.value,
                                 phone_number=e_phone.value,
-                                password=e_id.value,
+                                password=e_password.value if e_password.value else e_id.value,
                                 role=e_role.value,
                                 department=e_dept.value,
                                 joining_date=join_date

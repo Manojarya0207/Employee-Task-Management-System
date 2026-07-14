@@ -362,19 +362,29 @@ body,
 .btn-neon.is-loading,
 .btn-neon.q-btn--loading {
     pointer-events: none;
+    color: transparent !important; /* hide the label without shrinking the button */
 }
 
+/* Fade the button's inner content out in place so the width never changes */
+.btn-neon.is-loading .q-btn__content {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+/* Centered overlay spinner — no layout shift, no text jump */
 .btn-neon.is-loading::after {
     content: '';
-    width: 16px;
-    height: 16px;
-    margin-left: 10px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
     border: 2px solid rgba(255, 255, 255, 0.4);
     border-top-color: #ffffff;
-    border-radius: 999px;
-    display: inline-block;
-    vertical-align: -3px;
-    animation: button-spin 0.75s linear infinite;
+    border-radius: 50%;
+    animation: button-spin 0.6s linear infinite;
+    z-index: 3;
 }
 
 @keyframes button-sheen {
