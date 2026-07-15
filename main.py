@@ -25,6 +25,8 @@ from pages.employee import init_employee_routes
 from pages.reports import init_reports_routes
 from pages.masters import init_masters_routes
 from pages.daily_tasks import init_daily_tasks_routes
+from routes import api_router
+
 
 from utils.logging_config import configure_logging
 from utils.error_pages import register_error_pages
@@ -105,8 +107,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
 
-        # Unrestricted path matches (NiceGUI internal paths, static files, login, and register)
-        unrestricted_prefixes = (PATH_LOGIN, '/register', '/_nicegui', '/static', '/favicon.ico')
+        # Unrestricted path matches (NiceGUI internal paths, static files, login, register, and REST API/Docs)
+        unrestricted_prefixes = (PATH_LOGIN, '/register', '/_nicegui', '/static', '/favicon.ico', '/api', '/docs', '/openapi.json')
         if any(path.startswith(prefix) for prefix in unrestricted_prefixes):
             return await call_next(request)
 
@@ -133,6 +135,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
 # 3. Mount routes and configure app
 init_db()
 run_migrations()   # Safe, idempotent — adds new columns and backfills existing rows
+
+# Add REST API routes
+app.include_router(api_router)
 
 # Add auth check middleware
 app.add_middleware(AuthMiddleware)

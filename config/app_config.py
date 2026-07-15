@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Absolute path to the project root.
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+BASE_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))  # Adjusted for being inside config/ directory
 
 
 # ---------------------------------------------------------------------------
@@ -28,6 +28,7 @@ ENVIRONMENT = os.environ.get(
     "production" if os.environ.get("RENDER") else "development",
 ).lower()
 
+# IS_PRODUCTION and IS_DEVELOPMENT
 IS_PRODUCTION = ENVIRONMENT == "production"
 IS_DEVELOPMENT = not IS_PRODUCTION
 
@@ -86,8 +87,9 @@ HOST = os.environ.get("HOST", "0.0.0.0")
 # ---------------------------------------------------------------------------
 # Default administrator (used only to seed an empty database)
 # ---------------------------------------------------------------------------
-DEFAULT_ADMIN_ID = os.environ.get("DEFAULT_ADMIN_ID", "admin")
+# DEFAULT_ADMIN_ID = os.environ.get("DEFAULT_ADMIN_ID", "admin")
 DEFAULT_ADMIN_PASSWORD = os.environ.get("DEFAULT_ADMIN_PASSWORD", "Admin@123")
+DEFAULT_ADMIN_ID = os.environ.get("DEFAULT_ADMIN_ID", "admin")
 
 
 # ---------------------------------------------------------------------------

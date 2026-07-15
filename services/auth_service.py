@@ -1,8 +1,9 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import Session
 from models.employee import Employee
-from models.activity_log import ActivityLog
 from datetime import datetime
+from repositories.employee_repository import EmployeeRepository
+from repositories.activity_log_repository import ActivityLogRepository
 
 def hash_password(password: str) -> str:
     """Generates a secure password hash."""
@@ -15,11 +16,8 @@ def check_password(password_hash: str, password: str) -> bool:
 def log_activity(db: Session, employee_id: str, action: str):
     """Inserts a new audit log record."""
     try:
-        log = ActivityLog(employee_id=employee_id, action=action)
-        db.add(log)
-        db.commit()
+        ActivityLogRepository.create(db, employee_id, action)
     except Exception as e:
-        db.rollback()
         print(f"Error logging activity: {e}")
 
 def authenticate_user(db: Session, employee_id: str, password: str) -> tuple[bool, Employee | None, str]:
@@ -29,7 +27,7 @@ def authenticate_user(db: Session, employee_id: str, password: str) -> tuple[boo
     Login is blocked until registration_status == 'approved'.
     Returns (success, Employee_object or None, error_message).
     """
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    employee = EmployeeRepository.get_by_id(db, employee_id)
     if not employee:
         return False, None, "Invalid Employee ID or Password."
 
@@ -60,7 +58,7 @@ def change_user_password(db: Session, employee_id: str, old_password: str, new_p
     Allows user to update their own password.
     Verifies old password before applying the new one.
     """
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    employee = EmployeeRepository.get_by_id(db, employee_id)
     if not employee:
         return False, "Employee not found"
         
@@ -75,7 +73,7 @@ def change_user_password(db: Session, employee_id: str, old_password: str, new_p
     employee.updated_at = datetime.now()
     
     try:
-        db.commit()
+        EmployeeRepository.save(db)
         log_activity(db, employee_id, "Password changed by user")
         return True, "Password changed successfully"
     except Exception as e:

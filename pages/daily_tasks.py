@@ -1,10 +1,9 @@
 from nicegui import app, ui
 from models import SessionLocal
-from models.task import Task
-from models.employee import Employee
-from models.status import TaskStatus
 from pages.layout import render_layout
 from datetime import date
+from controllers.task_controller import TaskController
+from controllers.status_controller import StatusController
 
 def init_daily_tasks_routes():
     # Trigger importing of page
@@ -21,14 +20,12 @@ def view_daily_tasks():
     def get_today_data():
         db = SessionLocal()
         try:
-            today = date.today()
-            tasks = db.query(Task, Employee).join(Employee, Task.employee_id == Employee.employee_id)\
-                .filter(Task.created_date == today)\
-                .order_by(Task.created_time.desc()).all()
+            res_tasks = TaskController.get_daily_tasks_data(db)
+            res_statuses = StatusController.get_task_statuses(db)
             
-            # Fetch status colors
-            statuses = db.query(TaskStatus).all()
-            status_colors = {s.name: s.color for s in statuses}
+            tasks = res_tasks["data"] if res_tasks["success"] else []
+            statuses = res_statuses["data"] if res_statuses["success"] else []
+            status_colors = {s["name"]: s["color"] for s in statuses}
             
             rows = []
             completed = 0
@@ -37,20 +34,20 @@ def view_daily_tasks():
             blocked = 0
             on_hold = 0
 
-            for t, e in tasks:
+            for t in tasks:
                 rows.append({
-                    'task_id': t.task_id,
-                    'time': t.created_time.strftime('%I:%M %p'),
-                    'employee_id': e.employee_id,
-                    'employee_name': e.employee_name,
-                    'department': e.department or 'N/A',
-                    'title': t.title,
-                    'description': t.description or 'No description.',
-                    'status': t.status,
-                    'status_color': status_colors.get(t.status, '#6b7280')
+                    'task_id': t['task_id'],
+                    'time': t['time'],
+                    'employee_id': t['employee_id'],
+                    'employee_name': t['employee_name'],
+                    'department': t['department'],
+                    'title': t['title'],
+                    'description': t['description'],
+                    'status': t['status'],
+                    'status_color': status_colors.get(t['status'], '#6b7280')
                 })
                 # Stats calculation
-                status_lower = t.status.lower()
+                status_lower = t['status'].lower()
                 if 'completed' in status_lower:
                     completed += 1
                 elif 'wip' in status_lower or 'progress' in status_lower:

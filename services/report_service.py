@@ -12,6 +12,9 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
+from repositories.task_repository import TaskRepository
+from datetime import timedelta
+
 def fetch_report_data(
     db: Session, 
     report_type: str, 
@@ -23,30 +26,20 @@ def fetch_report_data(
     """
     Fetches task records matching report criteria joined with Employee details.
     """
-    query = db.query(Task, Employee).join(Employee, Task.employee_id == Employee.employee_id)
-    
-    # Apply date filters based on report type
     today = date.today()
     if report_type == 'daily':
-        query = query.filter(Task.created_date == today)
+        start_date = today
+        end_date = today
     elif report_type == 'weekly':
-        query = query.filter(Task.created_date >= (today - timedelta(days=7)))
+        start_date = today - timedelta(days=7)
+        end_date = today
     elif report_type == 'monthly':
-        query = query.filter(Task.created_date >= (today - timedelta(days=30)))
-    else:
-        # Custom or other filters
-        if start_date:
-            query = query.filter(Task.created_date >= start_date)
-        if end_date:
-            query = query.filter(Task.created_date <= end_date)
-            
-    # Additional filters
-    if employee_id and employee_id != 'All':
-        query = query.filter(Task.employee_id == employee_id)
-    if status and status != 'All':
-        query = query.filter(Task.status == status)
-        
-    results = query.order_by(Task.created_date.desc(), Task.created_time.desc()).all()
+        start_date = today - timedelta(days=30)
+        end_date = today
+
+    results = TaskRepository.get_tasks_joined_with_employees(
+        db, start_date=start_date, end_date=end_date, employee_id=employee_id, status=status
+    )
     
     data = []
     for task, emp in results:
@@ -63,6 +56,7 @@ def fetch_report_data(
             'last_modified': task.last_modified.strftime('%Y-%m-%d %I:%M %p')
         })
     return data
+
 
 def export_csv(data: list[dict]) -> io.BytesIO:
     """Generates a CSV file buffer from report data."""

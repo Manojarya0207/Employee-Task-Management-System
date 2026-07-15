@@ -1,17 +1,16 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_, func
 from models.task import Task
-from models.employee import Employee
 from services.auth_service import log_activity
 from datetime import date, datetime, timedelta
+from repositories.task_repository import TaskRepository
 
 def get_task_by_id(db: Session, task_id: int) -> Task | None:
     """Retrieves a task by its unique numeric ID."""
-    return db.query(Task).filter(Task.task_id == task_id).first()
+    return TaskRepository.get_by_id(db, task_id)
 
 def get_employee_tasks(db: Session, employee_id: str) -> list[Task]:
     """Retrieves all tasks associated with a specific employee."""
-    return db.query(Task).filter(Task.employee_id == employee_id).order_by(Task.created_date.desc(), Task.created_time.desc()).all()
+    return TaskRepository.get_by_employee_id(db, employee_id)
 
 def add_task(
     db: Session, 
@@ -37,9 +36,7 @@ def add_task(
             created_time=datetime.now().time(),
             last_modified=datetime.now()
         )
-        db.add(new_task)
-        db.commit()
-        
+        TaskRepository.create(db, new_task)
         log_activity(db, employee_id, f"Created task: {title[:30]}")
         return True, "Task submitted successfully"
     except Exception as e:
@@ -58,7 +55,7 @@ def update_task(
     Updates an employee's task.
     Allowed ONLY if the task was created TODAY.
     """
-    task = get_task_by_id(db, task_id)
+    task = TaskRepository.get_by_id(db, task_id)
     if not task:
         return False, "Task not found"
         
@@ -79,7 +76,7 @@ def update_task(
         task.updated_time = datetime.now().time()
         task.last_modified = datetime.now()
         
-        db.commit()
+        TaskRepository.save(db)
         log_activity(db, employee_id, f"Updated task: {title[:30]}")
         return True, "Task updated successfully"
     except Exception as e:
@@ -98,28 +95,9 @@ def get_filtered_tasks(
     Advanced task filtering system.
     Supports filtering by Employee, Status, Text Search, and Date Range.
     """
-    query = db.query(Task)
-    
-    # 1. Filter by employee
-    if employee_id:
-        query = query.filter(Task.employee_id == employee_id)
-        
-    # 2. Filter by status
-    if status_filter and status_filter != 'All':
-        query = query.filter(Task.status == status_filter)
-        
-    # 3. Filter by search query
-    if query_str:
-        pattern = f"%{query_str}%"
-        query = query.filter(or_(Task.title.like(pattern), Task.description.like(pattern)))
-        
-    # 4. Filter by date range
-    if start_date:
-        query = query.filter(Task.created_date >= start_date)
-    if end_date:
-        query = query.filter(Task.created_date <= end_date)
-        
-    return query.order_by(Task.created_date.desc(), Task.created_time.desc()).all()
+    return TaskRepository.get_filtered_tasks(
+        db, employee_id, status_filter, query_str, start_date, end_date
+    )
 
 def get_tasks_by_period(db: Session, employee_id: str, period: str) -> list[Task]:
     """
@@ -150,7 +128,7 @@ def get_calendar_events(db: Session, employee_id: str) -> list[dict]:
     Formats the employee's task submissions for visual rendering in a calendar.
     Returns a list of dicts: [{'date': 'YYYY-MM-DD', 'color': 'color', 'count': X, 'tasks': [...]}]
     """
-    tasks = db.query(Task).filter(Task.employee_id == employee_id).all()
+    tasks = TaskRepository.get_by_employee_id(db, employee_id)
     
     # Group tasks by date
     grouped = {}

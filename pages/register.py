@@ -1,11 +1,8 @@
 from nicegui import app, ui
 from models import SessionLocal
-from models.employee import Employee
-from services.registration_service import (
-    generate_employee_id,
-    generate_unique_employee_id,
-    register_employee,
-)
+from services.registration_service import generate_employee_id
+from controllers.auth_controller import AuthController
+from repositories.employee_repository import EmployeeRepository
 import re
 import asyncio
 
@@ -35,7 +32,6 @@ class RegistrationForm:
     def refresh_emp_id(self):
         name = self.name_input.value or ''
         phone = self.phone_input.value or ''
-        # Only show ID when at least something meaningful is typed
         if len(re.sub(r'[^a-zA-Z]', '', name)) > 0 or len(re.sub(r'\D', '', phone)) >= 4:
             self.emp_id_label.set_text(generate_employee_id(name, phone) or '—')
         else:
@@ -53,7 +49,7 @@ class RegistrationForm:
             self.name_hint.set_text(f'{remain} more character(s) needed')
             self.name_hint.classes(remove='hint-ok hint-neutral', add='hint-error')
         self.refresh_emp_id()
-        self.validate_confirm()  # re-check confirm if pwd changed
+        self.validate_confirm()
         self.update_btn()
 
     def validate_phone(self):
@@ -61,7 +57,7 @@ class RegistrationForm:
         if len(val) == 10:
             db = SessionLocal()
             try:
-                phone_exists = db.query(Employee).filter(Employee.phone_number == val).first()
+                phone_exists = EmployeeRepository.get_by_phone(db, val)
                 if phone_exists:
                     self.state['phone_ok'] = False
                     self.phone_hint.set_text('✗ Phone number is already registered')
@@ -143,16 +139,17 @@ class RegistrationForm:
 
         db = SessionLocal()
         try:
-            success, message, emp_id = register_employee(
+            res = AuthController.register(
                 db=db,
-                employee_name=self.name_input.value.strip(),
-                phone_number=self.phone_input.value.strip(),
+                name=self.name_input.value.strip(),
+                phone=self.phone_input.value.strip(),
                 password=self.pwd_input.value,
                 department=self.other_dept_input.value.strip() if self.dept_select.value == 'Others' else self.dept_select.value,
             )
 
-            if success:
+            if res["success"]:
                 self.form_container.set_visibility(False)
+                emp_id = res["data"]["employee_id"]
 
                 ui.notify(
                     'Registration submitted! Awaiting admin approval.',
@@ -180,7 +177,7 @@ class RegistrationForm:
                 ui.navigate.to('/login')
 
             else:
-                ui.notify(message, type='negative', duration=5000)
+                ui.notify(res["message"], type='negative', duration=5000)
                 self.state['submitting'] = False
                 self.register_btn.props(remove='loading')
                 self.register_btn.props(remove='disable')

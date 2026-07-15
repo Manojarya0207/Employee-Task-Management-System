@@ -1,7 +1,6 @@
 from nicegui import app, ui
 from models import SessionLocal
-from models.employee import Employee
-from services.auth_service import authenticate_user
+from controllers.auth_controller import AuthController
 
 # Helper functions to reduce login_page complexity
 def perform_login(employee_id_input, password_input, show_status_view):
@@ -14,24 +13,26 @@ def perform_login(employee_id_input, password_input, show_status_view):
         
     db = SessionLocal()
     try:
-        success, employee, message = authenticate_user(db, emp_id, pwd)
-        if success and employee:
+        res = AuthController.login(db, emp_id, pwd)
+        if res["success"]:
             # Set user session storage
+            data = res["data"]
             app.storage.user.update({
-                'employee_id': employee.employee_id,
-                'employee_name': employee.employee_name,
-                'role': employee.role,
+                'employee_id': data['employee_id'],
+                'employee_name': data['employee_name'],
+                'role': data['role'],
                 'authenticated': True
             })
-            ui.notify(f"Welcome back, {employee.employee_name}!", type='positive')
+            ui.notify(f"Welcome back, {data['employee_name']}!", type='positive')
             
             # Enforce change password reminder if default admin pwd matches
-            if employee.employee_id == 'admin' and pwd == 'Admin@123':
+            if data['employee_id'] == 'admin' and pwd == 'Admin@123':
                 ui.notify('SECURITY WARNING: Please change your default password immediately!', type='negative', duration=10)
                 
-            ui.navigate.to('/admin' if employee.role == 'admin' else '/employee')
+            ui.navigate.to('/admin' if data['role'] == 'admin' else '/employee')
         else:
             # Support multi-line messages (e.g. rejection reason)
+            message = res["message"]
             display_msg = message.replace('\n', '<br>') if '\n' in message else message
             ui.notify(display_msg, type='negative', html=True, duration=7000)
             
@@ -39,9 +40,11 @@ def perform_login(employee_id_input, password_input, show_status_view):
             if employee_id_input.value:
                 db_check = SessionLocal()
                 try:
-                    emp = db_check.query(Employee).filter(Employee.employee_id == employee_id_input.value).first()
-                    if emp and getattr(emp, 'registration_status', 'approved') in ('pending', 'rejected'):
-                        show_status_view(employee_id_input.value)
+                    res_check = AuthController.get_registration_status(db_check, employee_id_input.value)
+                    if res_check["success"]:
+                        status = res_check["data"]["registration_status"]
+                        if status in ('pending', 'rejected'):
+                            show_status_view(employee_id_input.value)
                 finally:
                     db_check.close()
     finally:
@@ -55,22 +58,23 @@ def check_registration_status(status_id_input, details_container):
     
     db = SessionLocal()
     try:
-        employee = db.query(Employee).filter(Employee.employee_id == id_to_check).first()
+        res = AuthController.get_registration_status(db, id_to_check)
         details_container.classes(remove='hidden')
         details_container.clear()
         with details_container:
-            if not employee:
+            if not res["success"]:
                 ui.label('No employee found with this ID.').classes('text-red-400 font-semibold text-sm')
             else:
-                status = getattr(employee, 'registration_status', 'approved')
-                ui.label(f"Employee: {employee.employee_name}").classes('text-white font-semibold text-sm mb-1')
+                data = res["data"]
+                ui.label(f"Employee: {data['employee_name']}").classes('text-white font-semibold text-sm mb-1')
+                status = data["registration_status"]
                 
                 if status == 'pending':
                     ui.label('Status: PENDING APPROVAL').classes('text-amber-400 font-bold text-sm mb-2')
                     ui.label('Your request is waiting for administrator approval. You will be able to sign in once approved.').classes('text-gray-300 text-xs leading-relaxed')
                 elif status == 'rejected':
                     ui.label('Status: REJECTED').classes('text-red-400 font-bold text-sm mb-1')
-                    reason = getattr(employee, 'rejection_reason', None)
+                    reason = data["rejection_reason"]
                     if reason:
                         ui.label(f"Reason: {reason}").classes('text-red-300 text-xs font-semibold mb-2 bg-red-950/50 p-2 rounded leading-relaxed')
                     else:

@@ -1,15 +1,12 @@
 from nicegui import app, ui
 from models import SessionLocal
-from models.status import TaskStatus, EmployeeStatus
 from pages.layout import render_layout
-import traceback
+from controllers.status_controller import StatusController
 
 def init_masters_routes():
-    # NiceGUI page routes are registered via the decorators.
-    # This dummy function is called to trigger the import and page registration.
     pass
 
-def render_master_page(model_class, page_title, page_subtitle, active_route):
+def render_master_page(status_type, page_title, page_subtitle, active_route):
     """
     Helper to render a complete status master management page with CRUD operations.
     """
@@ -20,12 +17,16 @@ def render_master_page(model_class, page_title, page_subtitle, active_route):
     def get_all_records():
         db = SessionLocal()
         try:
-            return db.query(model_class).all()
+            if status_type == 'task':
+                res = StatusController.get_task_statuses(db)
+            else:
+                res = StatusController.get_employee_statuses(db)
+            return res["data"] if res["success"] else []
         finally:
             db.close()
 
     records = get_all_records()
-    rows = [{'id': r.id, 'name': r.name, 'description': r.description or '', 'color': r.color} for r in records]
+    rows = [{'id': r['name'], 'name': r['name'], 'description': r['description'] or '', 'color': r['color']} for r in records]
 
     with render_layout(active_route):
         # Header
@@ -79,16 +80,16 @@ def render_master_page(model_class, page_title, page_subtitle, active_route):
             all_recs = get_all_records()
             filtered = []
             for r in all_recs:
-                if not query_str or query_str in r.name.lower() or (r.description and query_str in r.description.lower()):
-                    filtered.append({'id': r.id, 'name': r.name, 'description': r.description or '', 'color': r.color})
+                if not query_str or query_str in r['name'].lower() or (r['description'] and query_str in r['description'].lower()):
+                    filtered.append({'id': r['name'], 'name': r['name'], 'description': r['description'] or '', 'color': r['color']})
             table.rows = filtered
 
         search_input.on('change', filter_records)
         search_input.on('keyup', filter_records)
 
-        # Define suggestions based on model class
+        # Define suggestions based on status type
         suggestions = []
-        if model_class.__name__ == 'TaskStatus':
+        if status_type == 'task':
             suggestions = [
                 {'name': 'Pending', 'desc': 'Task has been created but not started', 'color': '#eab308'},
                 {'name': 'Work In Progress', 'desc': 'Task is currently being worked on', 'color': '#3b82f6'},
@@ -96,7 +97,7 @@ def render_master_page(model_class, page_title, page_subtitle, active_route):
                 {'name': 'Blocked', 'desc': 'Task is blocked by dependency or issue', 'color': '#ef4444'},
                 {'name': 'On Hold', 'desc': 'Task is temporarily suspended', 'color': '#8b5cf6'}
             ]
-        elif model_class.__name__ == 'EmployeeStatus':
+        else:
             suggestions = [
                 {'name': 'active', 'desc': 'Employee is active and working', 'color': '#10b981'},
                 {'name': 'inactive', 'desc': 'Employee has left or is inactive', 'color': '#ef4444'},
@@ -163,12 +164,14 @@ def render_master_page(model_class, page_title, page_subtitle, active_route):
             if record:
                 dialog_title.text = 'Edit Status'
                 name_input.value = record['name']
+                name_input.props('disable')  # Name is key
                 desc_input.value = record['description']
                 color_input.value = record['color']
                 current_edit_record_id[0] = record['id']
             else:
                 dialog_title.text = 'Create Status'
                 name_input.value = ''
+                name_input.props(remove='disable')
                 desc_input.value = ''
                 color_input.value = '#6b7280'
                 current_edit_record_id[0] = None
@@ -187,29 +190,27 @@ def render_master_page(model_class, page_title, page_subtitle, active_route):
 
             db = SessionLocal()
             try:
-                # Check duplicate name
-                dup_query = db.query(model_class).filter(model_class.name.ilike(name))
                 if record_id:
-                    dup_query = dup_query.filter(model_class.id != record_id)
-                dup = dup_query.first()
-                if dup:
-                    ui.notify(f'A status with name "{name}" already exists.', type='warning')
-                    return
-
-                if record_id:
-                    rec = db.query(model_class).filter(model_class.id == record_id).first()
-                    if rec:
-                        rec.name = name
-                        rec.description = desc
-                        rec.color = color
+                    # Update (delete then re-add, or update description/color)
+                    # For simplicity, we delete status first if it was changed, or we just call add/delete
+                    if status_type == 'task':
+                        StatusController.delete_task_status(db, record_id)
+                        res = StatusController.add_task_status(db, name, desc, color)
+                    else:
+                        StatusController.delete_employee_status(db, record_id)
+                        res = StatusController.add_employee_status(db, name, desc, color)
                 else:
-                    rec = model_class(name=name, description=desc, color=color)
-                    db.add(rec)
+                    if status_type == 'task':
+                        res = StatusController.add_task_status(db, name, desc, color)
+                    else:
+                        res = StatusController.add_employee_status(db, name, desc, color)
                 
-                db.commit()
-                ui.notify('Status saved successfully', type='positive')
-                dialog.close()
-                filter_records()
+                if res["success"]:
+                    ui.notify('Status saved successfully', type='positive')
+                    dialog.close()
+                    filter_records()
+                else:
+                    ui.notify(res["message"], type='warning')
             except Exception as e:
                 db.rollback()
                 ui.notify(f'Error saving status: {str(e)}', type='negative')
@@ -232,11 +233,14 @@ def render_master_page(model_class, page_title, page_subtitle, active_route):
                 return
             db = SessionLocal()
             try:
-                rec = db.query(model_class).filter(model_class.id == record_id).first()
-                if rec:
-                    db.delete(rec)
-                    db.commit()
+                if status_type == 'task':
+                    res = StatusController.delete_task_status(db, record_id)
+                else:
+                    res = StatusController.delete_employee_status(db, record_id)
+                if res["success"]:
                     ui.notify('Status deleted successfully', type='positive')
+                else:
+                    ui.notify(res["message"], type='warning')
                 delete_dialog.close()
                 filter_records()
             except Exception as e:
@@ -255,11 +259,10 @@ def render_master_page(model_class, page_title, page_subtitle, active_route):
         table.on('delete_record', lambda msg: open_delete_modal(msg.args))
 
 
-
 @ui.page('/admin/masters/task-statuses')
 def manage_task_statuses():
     render_master_page(
-        model_class=TaskStatus,
+        status_type='task',
         page_title='Task Status Master',
         page_subtitle='Manage statuses available for employee tasks',
         active_route='/admin/masters/task-statuses'
@@ -268,7 +271,7 @@ def manage_task_statuses():
 @ui.page('/admin/masters/employee-statuses')
 def manage_employee_statuses():
     render_master_page(
-        model_class=EmployeeStatus,
+        status_type='employee',
         page_title='Employee Status Master',
         page_subtitle='Manage statuses available for employees',
         active_route='/admin/masters/employee-statuses'

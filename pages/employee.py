@@ -1,17 +1,25 @@
 from nicegui import app, ui
 from models import SessionLocal
-from models.task import Task
-from models.employee import Employee
-from models.status import TaskStatus
-from services.task_service import (
-    get_employee_tasks, add_task, update_task, 
-    get_filtered_tasks, get_tasks_by_period, get_calendar_events
-)
-from services.auth_service import change_user_password
-from services.employee_service import get_employee_by_id
+from controllers.task_controller import TaskController
+from controllers.status_controller import StatusController
+from controllers.employee_controller import EmployeeController
+from controllers.auth_controller import AuthController
 from pages.layout import render_layout
-from datetime import date, datetime, timedelta
+from repositories.employee_repository import EmployeeRepository
+from datetime import date, datetime, timedelta, time
 import json
+
+def parse_time_string(val):
+    if not isinstance(val, str):
+        return val
+    try:
+        return time.fromisoformat(val)
+    except ValueError:
+        try:
+            return datetime.strptime(val, '%H:%M:%S.%f').time()
+        except ValueError:
+            return datetime.strptime(val, '%H:%M:%S').time()
+
 
 # Constants to avoid duplicated string literal smells
 STATUS_COMPLETED = 'Completed'
@@ -44,20 +52,13 @@ DESC_TASK_DESCRIPTION = 'Task Description'
 TIME_FORMAT_12H = '%I:%M %p'
 DATE_FORMAT = '%Y-%m-%d'
 
-STATUS_OPTIONS = {
-    STATUS_PENDING: STATUS_PENDING,
-    STATUS_WIP: STATUS_WIP,
-    STATUS_COMPLETED: STATUS_COMPLETED,
-    STATUS_BLOCKED: STATUS_BLOCKED,
-    STATUS_HOLD: STATUS_HOLD
-}
-
 # Module-level Modal Helpers
 def open_add_task_modal(callback=None):
     emp_id = app.storage.user.get('employee_id')
     db = SessionLocal()
     try:
-        statuses = db.query(TaskStatus).all()
+        res = StatusController.get_task_statuses(db)
+        statuses = res["data"] if res["success"] else []
     finally:
         db.close()
 
@@ -73,8 +74,8 @@ def open_add_task_modal(callback=None):
             t_title = ui.input('Task Title').classes(CLASS_WFULL_MB3).props('outlined color=primary')
             t_desc = ui.textarea(DESC_TASK_DESCRIPTION).classes(CLASS_WFULL_MB3).props('outlined color=primary')
             
-            status_options = {s.name: s.name for s in statuses}
-            t_status = ui.select(status_options, value=statuses[0].name).classes(CLASS_WFULL_MB6).props('outlined')
+            status_options = {s['name']: s['name'] for s in statuses}
+            t_status = ui.select(status_options, value=statuses[0]['name']).classes(CLASS_WFULL_MB6).props('outlined')
 
             def save():
                 if not t_title.value:
@@ -83,22 +84,22 @@ def open_add_task_modal(callback=None):
                     
                 s_db = SessionLocal()
                 try:
-                    ok, msg = add_task(
+                    res_add = TaskController.add(
                         db=s_db,
                         employee_id=emp_id,
                         title=t_title.value,
                         description=t_desc.value,
                         status=t_status.value
                     )
-                    if ok:
-                        ui.notify(msg, type='positive')
+                    if res_add["success"]:
+                        ui.notify(res_add["message"], type='positive')
                         dialog.close()
                         if callback:
                             callback()
                         else:
                             ui.navigate.to(PATH_EMPLOYEE)
                     else:
-                        ui.notify(msg, type='negative')
+                        ui.notify(res_add["message"], type='negative')
                 finally:
                     s_db.close()
 
@@ -111,7 +112,8 @@ def open_edit_task_modal(row_data, callback=None):
     emp_id = app.storage.user.get('employee_id')
     db = SessionLocal()
     try:
-        statuses = db.query(TaskStatus).all()
+        res = StatusController.get_task_statuses(db)
+        statuses = res["data"] if res["success"] else []
     finally:
         db.close()
 
@@ -127,7 +129,7 @@ def open_edit_task_modal(row_data, callback=None):
             t_title = ui.input('Task Title', value=row_data['title']).classes(CLASS_WFULL_MB3).props('outlined color=primary')
             t_desc = ui.textarea(DESC_TASK_DESCRIPTION, value=row_data['description']).classes(CLASS_WFULL_MB3).props('outlined color=primary')
             
-            status_options = {s.name: s.name for s in statuses}
+            status_options = {s['name']: s['name'] for s in statuses}
             current_status = row_data['status']
             if current_status not in status_options:
                 status_options[current_status] = current_status
@@ -140,7 +142,7 @@ def open_edit_task_modal(row_data, callback=None):
                     
                 s_db = SessionLocal()
                 try:
-                    ok, msg = update_task(
+                    res_up = TaskController.update(
                         db=s_db,
                         employee_id=emp_id,
                         task_id=row_data['task_id'],
@@ -148,13 +150,13 @@ def open_edit_task_modal(row_data, callback=None):
                         description=t_desc.value,
                         status=t_status.value
                     )
-                    if ok:
-                        ui.notify(msg, type='positive')
+                    if res_up["success"]:
+                        ui.notify(res_up["message"], type='positive')
                         dialog.close()
                         if callback:
                             callback()
                     else:
-                        ui.notify(msg, type='negative')
+                        ui.notify(res_up["message"], type='negative')
                 finally:
                     s_db.close()
 
@@ -178,25 +180,24 @@ def employee_dashboard():
         today = date.today()
         
         # Fetch employee profile details
-        emp_profile = get_employee_by_id(db, emp_id)
+        emp_profile = EmployeeRepository.get_by_id(db, emp_id)
         
         # Fetch task statuses
-        statuses = db.query(TaskStatus).all()
+        res_statuses = StatusController.get_task_statuses(db)
+        statuses = res_statuses["data"] if res_statuses["success"] else []
         has_statuses = len(statuses) > 0
-        status_colors = {s.name: s.color for s in statuses}
+        status_colors = {s['name']: s['color'] for s in statuses}
         
         # Fetch today's tasks
-        today_tasks = db.query(Task).filter(
-            Task.employee_id == emp_id,
-            Task.created_date == today
-        ).order_by(Task.created_time.desc()).all()
+        res_tasks = TaskController.get_filtered(db, employee_id=emp_id, start_date=today, end_date=today)
+        today_tasks = res_tasks["data"] if res_tasks["success"] else []
         
         today_count = len(today_tasks)
         completed_count = 0
         wip_count = 0
         pending_count = 0
         for t in today_tasks:
-            status_lower = t.status.lower()
+            status_lower = t['status'].lower()
             if 'completed' in status_lower:
                 completed_count += 1
             elif 'wip' in status_lower or 'progress' in status_lower:
@@ -206,10 +207,8 @@ def employee_dashboard():
         
         # This week's tasks count
         start_of_week = today - timedelta(days=today.weekday())
-        week_tasks_count = db.query(Task).filter(
-            Task.employee_id == emp_id,
-            Task.created_date >= start_of_week
-        ).count()
+        res_week = TaskController.get_filtered(db, employee_id=emp_id, start_date=start_of_week)
+        week_tasks_count = len(res_week["data"]) if res_week["success"] else 0
         
         # Check reminder requirement (If past 6:00 PM and no submissions today)
         show_reminder = False
@@ -219,14 +218,16 @@ def employee_dashboard():
 
         rows = []
         for t in today_tasks:
+            # Parse times safely
+            t_time_parsed = parse_time_string(t['created_time'])
             rows.append({
-                'task_id': t.task_id,
-                'title': t.title,
-                'description': t.description or 'No description provided.',
-                'status': t.status,
-                'status_color': status_colors.get(t.status, '#6b7280'),
-                'time': t.created_time.strftime(TIME_FORMAT_12H),
-                'last_modified': t.last_modified.strftime(TIME_FORMAT_12H)
+                'task_id': t['task_id'],
+                'title': t['title'],
+                'description': t['description'] or 'No description provided.',
+                'status': t['status'],
+                'status_color': status_colors.get(t['status'], '#6b7280'),
+                'time': t_time_parsed.strftime(TIME_FORMAT_12H) if hasattr(t_time_parsed, 'strftime') else str(t_time_parsed),
+                'last_modified': t['created_time']  # Placeholder for simple display
             })
     finally:
         db.close()
@@ -316,6 +317,16 @@ def employee_dashboard():
                 </q-td>
             ''')
 
+            # Render custom description wrap
+            table.add_slot('body-cell-description', '''
+                <q-td :props="props">
+                    <div style="white-space: normal; word-break: break-word; max-width: 450px; min-width: 200px; text-align: left;">
+                        {{ props.value }}
+                    </div>
+                </q-td>
+            ''')
+
+
             # Action buttons (Edit enabled because it is today's task table)
             table.add_slot('body-cell-actions', '''
                 <q-td :props="props">
@@ -343,23 +354,29 @@ def task_history():
     
     db = SessionLocal()
     try:
-        statuses = db.query(TaskStatus).all()
-        status_colors = {s.name: s.color for s in statuses}
+        res_statuses = StatusController.get_task_statuses(db)
+        statuses = res_statuses["data"] if res_statuses["success"] else []
+        status_colors = {s['name']: s['color'] for s in statuses}
         
-        tasks = get_employee_tasks(db, emp_id)
-        events = get_calendar_events(db, emp_id)
+        res_tasks = TaskController.get_employee_tasks(db, emp_id)
+        tasks = res_tasks["data"] if res_tasks["success"] else []
+        
+        res_events = TaskController.get_calendar_events(db, emp_id)
+        events = res_events["data"] if res_events["success"] else []
         
         rows = []
         for t in tasks:
+            t_date = datetime.strptime(t['created_date'], '%Y-%m-%d').date() if isinstance(t['created_date'], str) else t['created_date']
+            t_time = parse_time_string(t['created_time'])
             rows.append({
-                'task_id': t.task_id,
-                'date': t.created_date.strftime(DATE_FORMAT),
-                'time': t.created_time.strftime(TIME_FORMAT_12H),
-                'title': t.title,
-                'description': t.description or 'No description.',
-                'status': t.status,
-                'status_color': status_colors.get(t.status, '#6b7280'),
-                'is_today': t.created_date == date.today()
+                'task_id': t['task_id'],
+                'date': t_date.strftime(DATE_FORMAT),
+                'time': t_time.strftime(TIME_FORMAT_12H),
+                'title': t['title'],
+                'description': t['description'] or 'No description.',
+                'status': t['status'],
+                'status_color': status_colors.get(t['status'], '#6b7280'),
+                'is_today': t_date == date.today()
             })
     finally:
         db.close()
@@ -394,16 +411,14 @@ def task_history():
                         
                         status_filter_options = {'All': 'All Statuses'}
                         for s in statuses:
-                            status_filter_options[s.name] = s.name
+                            status_filter_options[s['name']] = s['name']
                         
                         status_filter = ui.select(status_filter_options, value='All').classes('w-48').props('outlined dense')
-                        
                         query_input = ui.input(placeholder='Search tasks...').classes('w-64').props('outlined dense color=primary')
                         
                     def run_filter():
                         f_db = SessionLocal()
                         try:
-                            # Apply period filters
                             p = period_filter.value
                             today = date.today()
                             s_date, e_date = None, None
@@ -417,29 +432,33 @@ def task_history():
                             elif p == 'last_month':
                                 s_date = today - timedelta(days=30)
                                 
-                            filtered = get_filtered_tasks(
+                            res_filtered = TaskController.get_filtered(
                                 db=f_db,
                                 employee_id=emp_id,
                                 start_date=s_date,
                                 end_date=e_date,
                                 status=status_filter.value if status_filter.value != 'All' else None,
-                                search_query=query_input.value.strip() if query_input.value else None
+                                query_str=query_input.value.strip() if query_input.value else None
                             )
+                            filtered = res_filtered["data"] if res_filtered["success"] else []
                             
-                            f_statuses = f_db.query(TaskStatus).all()
-                            f_status_colors = {s.name: s.color for s in f_statuses}
+                            res_f_statuses = StatusController.get_task_statuses(f_db)
+                            f_statuses = res_f_statuses["data"] if res_f_statuses["success"] else []
+                            f_status_colors = {s['name']: s['color'] for s in f_statuses}
                             
                             t_rows = []
                             for t in filtered:
+                                t_date = datetime.strptime(t['created_date'], '%Y-%m-%d').date() if isinstance(t['created_date'], str) else t['created_date']
+                                t_time = parse_time_string(t['created_time'])
                                 t_rows.append({
-                                    'task_id': t.task_id,
-                                    'date': t.created_date.strftime(DATE_FORMAT),
-                                    'time': t.created_time.strftime(TIME_FORMAT_12H),
-                                    'title': t.title,
-                                    'description': t.description or 'No description.',
-                                    'status': t.status,
-                                    'status_color': f_status_colors.get(t.status, '#6b7280'),
-                                    'is_today': t.created_date == today
+                                    'task_id': t['task_id'],
+                                    'date': t_date.strftime(DATE_FORMAT),
+                                    'time': t_time.strftime(TIME_FORMAT_12H),
+                                    'title': t['title'],
+                                    'description': t['description'] or 'No description.',
+                                    'status': t['status'],
+                                    'status_color': f_status_colors.get(t['status'], '#6b7280'),
+                                    'is_today': t_date == today
                                 })
                             table.rows = t_rows
                         finally:
@@ -471,6 +490,16 @@ def task_history():
                         </span>
                     </q-td>
                 ''')
+
+                # Custom description wrap
+                table.add_slot('body-cell-description', '''
+                    <q-td :props="props">
+                        <div style="white-space: normal; word-break: break-word; max-width: 450px; min-width: 200px; text-align: left;">
+                            {{ props.value }}
+                        </div>
+                    </q-td>
+                ''')
+
                 
                 # Custom action: Edit is enabled ONLY for today's tasks
                 table.add_slot('body-cell-actions', '''
@@ -492,14 +521,11 @@ def task_history():
                 with ui.element('div').classes(CLASS_GLASS_CARD_WFULL):
                     ui.label('Monthly Activity Tracker').classes('text-lg font-semibold mb-4')
                     
-                    # FullCalendar CDN scripts inclusion
                     ui.add_head_html('<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">')
                     ui.add_head_html('<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>')
                     
-                    # Target DIV
                     ui.html('<div id="calendar-element" style="max-width: 900px; margin: 0 auto; color: #0F172A;"></div>').classes('w-full p-2')
                     
-                    # Inject JS Initialization script
                     js_events = json.dumps(events)
                     ui.run_javascript(f"""
                         setTimeout(() => {{
@@ -539,7 +565,7 @@ def employee_profile():
     
     db = SessionLocal()
     try:
-        emp = get_employee_by_id(db, emp_id)
+        emp = EmployeeRepository.get_by_id(db, emp_id)
     finally:
         db.close()
 
@@ -581,7 +607,7 @@ def employee_profile():
                         
                     with ui.element('div'):
                         ui.label('Joining Date').classes(CLASS_TEXT_GRAY_500_XS)
-                        ui.label(emp.joining_date.strftime(DATE_FORMAT)).classes(CLASS_FONT_SEMIBOLD_BASE)
+                        ui.label(emp.joining_date.strftime(DATE_FORMAT) if emp.joining_date else 'N/A').classes(CLASS_FONT_SEMIBOLD_BASE)
                         
             # Column 2: Password change card
             with ui.element('div').classes('glass-card p-6 col-span-1'):
@@ -606,19 +632,19 @@ def employee_profile():
                         
                     s_db = SessionLocal()
                     try:
-                        ok, msg = change_user_password(
+                        res_pwd = AuthController.change_password(
                             db=s_db,
                             employee_id=emp_id,
                             old_password=old_pwd.value,
                             new_password=new_pwd.value
                         )
-                        if ok:
-                            ui.notify(msg, type='positive')
+                        if res_pwd["success"]:
+                            ui.notify(res_pwd["message"], type='positive')
                             old_pwd.value = ''
                             new_pwd.value = ''
                             confirm_pwd.value = ''
                         else:
-                            ui.notify(msg, type='negative')
+                            ui.notify(res_pwd["message"], type='negative')
                     finally:
                         s_db.close()
                         

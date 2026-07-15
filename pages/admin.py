@@ -59,35 +59,35 @@ def admin_dashboard():
     db = SessionLocal()
     try:
         today = date.today()
+        from repositories.employee_repository import EmployeeRepository
+        from repositories.task_repository import TaskRepository
         
         # 1. Gather Statistics
-        total_employees = db.query(Employee).count()
-        inactive_employees = db.query(Employee).filter(Employee.status == 'inactive').count()
+        total_employees = EmployeeRepository.count_all(db)
+        inactive_employees = EmployeeRepository.count_by_status(db, 'inactive')
         
-        today_tasks = db.query(Task).filter(Task.created_date == today).all()
-        today_count = len(today_tasks)
+        today_tasks_joined = TaskRepository.get_today_tasks_with_employees(db, today)
+        today_count = len(today_tasks_joined)
         
-        completed_today = sum(1 for t in today_tasks if t.status == STATUS_COMPLETED)
-        wip_today = sum(1 for t in today_tasks if t.status == STATUS_WIP)
-        pending_today = sum(1 for t in today_tasks if t.status == STATUS_PENDING)
-        blocked_today = sum(1 for t in today_tasks if t.status == STATUS_BLOCKED)
-        on_hold_today = sum(1 for t in today_tasks if t.status == STATUS_HOLD)
+        completed_today = sum(1 for t, e in today_tasks_joined if t.status == STATUS_COMPLETED)
+        wip_today = sum(1 for t, e in today_tasks_joined if t.status == STATUS_WIP)
+        pending_today = sum(1 for t, e in today_tasks_joined if t.status == STATUS_PENDING)
+        blocked_today = sum(1 for t, e in today_tasks_joined if t.status == STATUS_BLOCKED)
+        on_hold_today = sum(1 for t, e in today_tasks_joined if t.status == STATUS_HOLD)
         
         # Completion Percentage
         completion_rate = round((completed_today / today_count) * 100) if today_count > 0 else 0
         
         # Recent Tasks Uploaded (last 8)
-        recent_tasks = db.query(Task, Employee)\
-            .join(Employee, Task.employee_id == Employee.employee_id)\
-            .order_by(Task.last_modified.desc())\
-            .limit(8).all()
+        recent_tasks = TaskRepository.get_tasks_joined_with_employees(db)
+        recent_tasks = recent_tasks[:8]
             
         # Chart Data - Last 7 Days Activity
         days_7 = [today - timedelta(days=i) for i in range(6, -1, -1)]
         days_labels = [d.strftime('%a %d') for d in days_7]
         daily_counts = []
         for d in days_7:
-            c = db.query(Task).filter(Task.created_date == d).count()
+            c = TaskRepository.count_by_date(db, d)
             daily_counts.append(c)
 
     finally:
@@ -384,7 +384,8 @@ def employee_management(action: str = None):
                     elif len(phone) == 10:
                         s_db = SessionLocal()
                         try:
-                            phone_exists = s_db.query(Employee).filter(Employee.phone_number == phone).first()
+                            from repositories.employee_repository import EmployeeRepository
+                            phone_exists = EmployeeRepository.get_by_phone(s_db, phone)
                             if phone_exists:
                                 e_phone_hint.set_text('✗ Phone number is already registered')
                                 e_phone_hint.classes(replace='text-xs mt-1 text-red-600')
@@ -1014,6 +1015,7 @@ def view_all_tasks():
 
     db = SessionLocal()
     try:
+        from repositories.task_repository import TaskRepository
         # Query all employees for filter dropdown
         employees = get_all_employees(db)
         emp_choices = {'All': 'All Employees'}
@@ -1021,8 +1023,7 @@ def view_all_tasks():
             emp_choices[e.employee_id] = f"{e.employee_name} ({e.employee_id})"
             
         # Fetch all tasks initially
-        tasks = db.query(Task, Employee).join(Employee, Task.employee_id == Employee.employee_id)\
-            .order_by(Task.created_date.desc(), Task.created_time.desc()).all()
+        tasks = TaskRepository.get_tasks_joined_with_employees(db)
             
         rows = []
         for t, e in tasks:
@@ -1066,57 +1067,42 @@ def view_all_tasks():
             def run_filter():
                 f_db = SessionLocal()
                 try:
-                    from sqlalchemy import or_
-                    query = f_db.query(Task, Employee).join(Employee, Task.employee_id == Employee.employee_id)
+                    from repositories.task_repository import TaskRepository
                     
-                    # Text search
-                    q = search_input.value
-                    if q:
-                        pattern = f"%{q}%"
-                        query = query.filter(
-                            or_(
-                                Task.title.like(pattern),
-                                Task.description.like(pattern),
-                                Employee.employee_name.like(pattern),
-                                Employee.employee_id.like(pattern)
-                            )
-                        )
-                        
-                    # Employee ID filter
-                    s_emp = emp_select.value
-                    if s_emp and s_emp != 'All':
-                        query = query.filter(Task.employee_id == s_emp)
-                        
-                    # Status filter
-                    s_status = status_select.value
-                    if s_status and s_status != 'All':
-                        query = query.filter(Task.status == s_status)
-                        
-                    # Dates
+                    sd, ed = None, None
                     if start_date.value:
                         try:
                             sd = datetime.strptime(start_date.value, '%Y-%m-%d').date()
-                            query = query.filter(Task.created_date >= sd)
                         except:
                             pass
                     if end_date.value:
                         try:
                             ed = datetime.strptime(end_date.value, '%Y-%m-%d').date()
-                            query = query.filter(Task.created_date <= ed)
                         except:
                             pass
-                            
-                    res = query.order_by(Task.created_date.desc(), Task.created_time.desc()).all()
-                    table.rows = [{
-                        'task_id': t.task_id,
-                        'date_time': f"{t.created_date.strftime('%Y-%m-%d')} {t.created_time.strftime('%I:%M %p')}",
-                        'employee_id': e.employee_id,
-                        'employee_name': e.employee_name,
-                        'department': e.department or 'N/A',
-                        'title': t.title,
-                        'description': t.description or 'No description.',
-                        'status': t.status
-                    } for t, e in res]
+
+                    s_emp = emp_select.value
+                    s_status = status_select.value
+
+                    res = TaskRepository.get_tasks_joined_with_employees(
+                        f_db, start_date=sd, end_date=ed, employee_id=s_emp, status=s_status
+                    )
+                    
+                    q = (search_input.value or '').strip().lower()
+                    t_rows = []
+                    for t, e in res:
+                        if not q or (q in t.title.lower() or q in (t.description or '').lower() or q in e.employee_name.lower() or q in e.employee_id.lower()):
+                            t_rows.append({
+                                'task_id': t.task_id,
+                                'date_time': f"{t.created_date.strftime('%Y-%m-%d')} {t.created_time.strftime('%I:%M %p')}",
+                                'employee_id': e.employee_id,
+                                'employee_name': e.employee_name,
+                                'department': e.department or 'N/A',
+                                'title': t.title,
+                                'description': t.description or 'No description.',
+                                'status': t.status
+                            })
+                    table.rows = t_rows
                 finally:
                     f_db.close()
 

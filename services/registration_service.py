@@ -19,6 +19,7 @@ from sqlalchemy import func
 
 from models.employee import Employee
 from services.auth_service import hash_password, log_activity
+from repositories.employee_repository import EmployeeRepository
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +109,7 @@ def register_employee(
         return False, "Password must be at least 6 characters.", None
 
     # --- Duplicate phone check ---
-    phone_exists = db.query(Employee).filter(
-        Employee.phone_number == clean_phone
-    ).first()
+    phone_exists = EmployeeRepository.get_by_phone(db, clean_phone)
     if phone_exists:
         return False, "This phone number is already registered.", None
 
@@ -133,8 +132,7 @@ def register_employee(
             rejected_at=None,
             rejection_reason=None,
         )
-        db.add(new_emp)
-        db.commit()
+        EmployeeRepository.create(db, new_emp)
         logger.info("New registration request: %s (%s)", employee_id, employee_name)
         return True, "Registration submitted successfully. Please wait for administrator approval.", employee_id
     except Exception as exc:
@@ -152,7 +150,7 @@ def approve_employee(db: Session, admin_id: str, employee_id: str) -> tuple[bool
     Approve a pending registration request.
     Sets registration_status → 'approved' and records approval timestamp.
     """
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    employee = EmployeeRepository.get_by_id(db, employee_id)
     if not employee:
         return False, "Employee not found."
 
@@ -165,7 +163,7 @@ def approve_employee(db: Session, admin_id: str, employee_id: str) -> tuple[bool
         employee.approved_at = datetime.now()
         employee.joining_date = date.today()   # set joining date at approval
         employee.updated_at = datetime.now()
-        db.commit()
+        EmployeeRepository.save(db)
         log_activity(db, admin_id, f"Approved registration: {employee_id}")
         logger.info("Admin '%s' approved employee '%s'.", admin_id, employee_id)
         return True, f"Employee '{employee.employee_name}' approved successfully."
@@ -182,7 +180,7 @@ def reject_employee(
     Reject a pending registration request.
     Sets registration_status → 'rejected' and records rejection reason + timestamp.
     """
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    employee = EmployeeRepository.get_by_id(db, employee_id)
     if not employee:
         return False, "Employee not found."
 
@@ -194,7 +192,7 @@ def reject_employee(
         employee.rejected_at = datetime.now()
         employee.rejection_reason = reason.strip() if reason else None
         employee.updated_at = datetime.now()
-        db.commit()
+        EmployeeRepository.save(db)
         log_activity(db, admin_id, f"Rejected registration: {employee_id}")
         logger.info("Admin '%s' rejected employee '%s'.", admin_id, employee_id)
         return True, f"Registration for '{employee.employee_name}' has been rejected."
@@ -210,12 +208,7 @@ def reject_employee(
 
 def get_pending_requests(db: Session) -> list[Employee]:
     """Return all employees with registration_status == 'pending', newest first."""
-    return (
-        db.query(Employee)
-        .filter(Employee.registration_status == 'pending')
-        .order_by(Employee.created_at.desc())
-        .all()
-    )
+    return EmployeeRepository.get_by_registration_status(db, 'pending')
 
 
 def get_all_registration_requests(

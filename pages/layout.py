@@ -1,6 +1,6 @@
 from nicegui import app, ui
 from models import SessionLocal
-from services.registration_service import count_pending_requests
+from controllers.employee_controller import EmployeeController
 
 def toggle_submenu(submenu, chevron):
     visible = not submenu.visible
@@ -17,7 +17,6 @@ def render_layout(active_route: str, action: str = None):
     Renders the common sidebar layout and wraps page content.
     Returns the page container to append components to.
     """
-    # Set theme colors for NiceGUI/Quasar matching the industrial UI system
     ui.colors(primary='#0f766e', secondary='#111827', accent='#14b8a6')
     ui.add_head_html('<link rel="stylesheet" href="/static/css/custom.css">')
     ui.add_head_html('<link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">')
@@ -84,7 +83,8 @@ def render_layout(active_route: str, action: str = None):
                 # Fetch pending registration count for the sidebar badge
                 try:
                     _db = SessionLocal()
-                    _pending = count_pending_requests(_db)
+                    res = EmployeeController.get_pending_registrations(_db)
+                    _pending = len(res["data"]) if (res["success"] and res["data"]) else 0
                     _db.close()
                 except Exception:
                     _pending = 0

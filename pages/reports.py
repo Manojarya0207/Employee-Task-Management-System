@@ -1,7 +1,7 @@
 from nicegui import app, ui
 from models import SessionLocal
-from services.employee_service import get_all_employees
-from services.report_service import fetch_report_data, export_csv, export_excel, export_pdf
+from controllers.employee_controller import EmployeeController
+from controllers.report_controller import ReportController
 from pages.layout import render_layout
 from datetime import date, datetime
 
@@ -17,10 +17,11 @@ def init_reports_routes():
         db = SessionLocal()
         try:
             # Query all employees for filter dropdown
-            employees = get_all_employees(db)
+            res_emp = EmployeeController.get_all(db)
+            employees = res_emp["data"] if res_emp["success"] else []
             emp_choices = {'All': 'All Employees'}
             for e in employees:
-                emp_choices[e.employee_id] = f"{e.employee_name} ({e.employee_id})"
+                emp_choices[e['employee_id']] = f"{e['employee_name']} ({e['employee_id']})"
         finally:
             db.close()
 
@@ -103,8 +104,8 @@ def init_reports_routes():
                             
                     db_session = SessionLocal()
                     try:
-                        # 1. Fetch data
-                        report_data = fetch_report_data(
+                        # Fetch report data
+                        res = ReportController.get_report_data(
                             db=db_session,
                             report_type=r_type,
                             start_date=s_date,
@@ -113,30 +114,29 @@ def init_reports_routes():
                             status=s_status
                         )
                         
-                        if not report_data:
+                        if not res["success"] or not res["data"]:
                             ui.notify('No records found matching current configuration criteria.', type='warning')
                             return
                             
-                        # Title naming
+                        report_data = res["data"]
                         title = f"{r_type.upper()} REPORT"
                         if r_type == 'custom':
                             title = f"CUSTOM REPORT ({s_date_str} to {e_date_str})"
                         
-                        # 2. Build files and download
                         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                         
                         if s_fmt == 'csv':
-                            buffer = export_csv(report_data)
+                            buffer = ReportController.export_csv(db_session, r_type, s_date, e_date, s_emp, s_status)
                             ui.download(buffer.getvalue(), filename=f"taskflow_report_{timestamp}.csv")
                             ui.notify('CSV report generated and download initiated.', type='positive')
                             
                         elif s_fmt == 'excel':
-                            buffer = export_excel(report_data, title)
+                            buffer = ReportController.export_excel(db_session, r_type, s_date, e_date, s_emp, s_status, title)
                             ui.download(buffer.getvalue(), filename=f"taskflow_report_{timestamp}.xlsx")
                             ui.notify('Excel report generated and download initiated.', type='positive')
                             
                         elif s_fmt == 'pdf':
-                            buffer = export_pdf(report_data, title)
+                            buffer = ReportController.export_pdf(db_session, r_type, s_date, e_date, s_emp, s_status, title)
                             ui.download(buffer.getvalue(), filename=f"taskflow_report_{timestamp}.pdf")
                             ui.notify('PDF report generated and download initiated.', type='positive')
                             

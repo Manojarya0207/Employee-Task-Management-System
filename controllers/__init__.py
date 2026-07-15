@@ -1,0 +1,6 @@
+from controllers.auth_controller import AuthController
+from controllers.employee_controller import EmployeeController
+from controllers.task_controller import TaskController
+from controllers.dashboard_controller import DashboardController
+from controllers.report_controller import ReportController
+from controllers.status_controller import StatusController

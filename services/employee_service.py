@@ -1,32 +1,22 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
 from models.employee import Employee
 from services.auth_service import hash_password, log_activity
 from datetime import datetime, date
+from repositories.employee_repository import EmployeeRepository
 
 def get_employee_by_id(db: Session, employee_id: str) -> Employee | None:
     """Retrieves an employee by their unique ID."""
-    return db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    return EmployeeRepository.get_by_id(db, employee_id)
 
 def get_all_employees(db: Session) -> list[Employee]:
     """Retrieves all employees in the system."""
-    return db.query(Employee).filter(Employee.registration_status == 'approved').order_by(Employee.employee_id).all()
+    return EmployeeRepository.get_all(db)
 
 def search_employees(db: Session, query_str: str) -> list[Employee]:
     """Searches employees by ID, Name, Phone, or Department."""
     if not query_str:
         return get_all_employees(db)
-        
-    search_pattern = f"%{query_str}%"
-    return db.query(Employee).filter(
-        Employee.registration_status == 'approved',
-        or_(
-            Employee.employee_id.like(search_pattern),
-            Employee.employee_name.like(search_pattern),
-            Employee.phone_number.like(search_pattern),
-            Employee.department.like(search_pattern)
-        )
-    ).order_by(Employee.employee_id).all()
+    return EmployeeRepository.search(db, query_str)
 
 def add_employee(
     db: Session, 
@@ -43,11 +33,10 @@ def add_employee(
     Creates a new employee account.
     Validates Employee ID uniqueness.
     """
-    # Validation checks
     if not employee_id or not employee_name or not phone_number or not password:
         return False, "All required fields (ID, Name, Phone, Password) must be filled"
         
-    existing = get_employee_by_id(db, employee_id)
+    existing = EmployeeRepository.get_by_id(db, employee_id)
     if existing:
         return False, f"Employee ID '{employee_id}' already exists"
         
@@ -63,11 +52,10 @@ def add_employee(
             role=role,
             department=department.strip() if department else None,
             joining_date=joining_date,
-            status='active'
+            status='active',
+            registration_status='approved'  # Added by default for admin actions
         )
-        db.add(new_emp)
-        db.commit()
-        
+        EmployeeRepository.create(db, new_emp)
         log_activity(db, creator_id, f"Added employee: {employee_id}")
         return True, "Employee added successfully"
     except Exception as e:
@@ -87,7 +75,7 @@ def update_employee(
     Updates an existing employee's details.
     Employee ID is immutable.
     """
-    employee = get_employee_by_id(db, employee_id)
+    employee = EmployeeRepository.get_by_id(db, employee_id)
     if not employee:
         return False, "Employee not found"
         
@@ -101,7 +89,7 @@ def update_employee(
         employee.status = status
         employee.updated_at = datetime.now()
         
-        db.commit()
+        EmployeeRepository.save(db)
         log_activity(db, updater_id, f"Updated employee details: {employee_id}")
         return True, "Employee updated successfully"
     except Exception as e:
@@ -110,7 +98,7 @@ def update_employee(
 
 def toggle_employee_status(db: Session, updater_id: str, employee_id: str) -> tuple[bool, str]:
     """Toggles employee account status between active and inactive."""
-    employee = get_employee_by_id(db, employee_id)
+    employee = EmployeeRepository.get_by_id(db, employee_id)
     if not employee:
         return False, "Employee not found"
         
@@ -121,7 +109,7 @@ def toggle_employee_status(db: Session, updater_id: str, employee_id: str) -> tu
     try:
         employee.status = new_status
         employee.updated_at = datetime.now()
-        db.commit()
+        EmployeeRepository.save(db)
         
         log_activity(db, updater_id, f"Toggled employee status to {new_status}: {employee_id}")
         return True, f"Employee is now {new_status}"
@@ -131,7 +119,7 @@ def toggle_employee_status(db: Session, updater_id: str, employee_id: str) -> tu
 
 def delete_employee(db: Session, admin_id: str, employee_id: str) -> tuple[bool, str]:
     """Deletes an employee account and its related tasks/activity logs."""
-    employee = get_employee_by_id(db, employee_id)
+    employee = EmployeeRepository.get_by_id(db, employee_id)
     if not employee:
         return False, "Employee not found"
 
@@ -139,7 +127,9 @@ def delete_employee(db: Session, admin_id: str, employee_id: str) -> tuple[bool,
         return False, "You cannot delete your own account!"
 
     if employee.role == 'admin':
-        admin_count = db.query(Employee).filter(Employee.role == 'admin').count()
+        # Quick check for other admin accounts
+        all_emps = EmployeeRepository.get_all(db)
+        admin_count = sum(1 for e in all_emps if e.role == 'admin')
         if admin_count <= 1:
             return False, "You cannot delete the last administrator account"
 
@@ -155,7 +145,7 @@ def delete_employee(db: Session, admin_id: str, employee_id: str) -> tuple[bool,
 
 def reset_employee_password(db: Session, admin_id: str, employee_id: str, new_password: str) -> tuple[bool, str]:
     """Allows an administrator to reset an employee's password."""
-    employee = get_employee_by_id(db, employee_id)
+    employee = EmployeeRepository.get_by_id(db, employee_id)
     if not employee:
         return False, "Employee not found"
         
@@ -165,7 +155,7 @@ def reset_employee_password(db: Session, admin_id: str, employee_id: str, new_pa
     try:
         employee.password_hash = hash_password(new_password)
         employee.updated_at = datetime.now()
-        db.commit()
+        EmployeeRepository.save(db)
         
         log_activity(db, admin_id, f"Reset password for employee: {employee_id}")
         return True, "Password reset successfully"
