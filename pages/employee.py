@@ -2,6 +2,7 @@ from nicegui import app, ui
 from models import SessionLocal
 from models.task import Task
 from models.employee import Employee
+from models.status import TaskStatus
 from services.task_service import (
     get_employee_tasks, add_task, update_task, 
     get_filtered_tasks, get_tasks_by_period, get_calendar_events
@@ -54,81 +55,112 @@ STATUS_OPTIONS = {
 # Module-level Modal Helpers
 def open_add_task_modal(callback=None):
     emp_id = app.storage.user.get('employee_id')
+    db = SessionLocal()
+    try:
+        statuses = db.query(TaskStatus).all()
+    finally:
+        db.close()
+
     with ui.dialog().classes(CLASS_WFULL_MAX_LG) as dialog, ui.card().classes(CLASS_GLASS_CARD_WFULL):
-        ui.label('Add Task Update').classes(CLASS_TEXT_XL_BOLD_MB4)
-        
-        t_title = ui.input('Task Title').classes(CLASS_WFULL_MB3).props('outlined color=primary')
-        t_desc = ui.textarea(DESC_TASK_DESCRIPTION).classes(CLASS_WFULL_MB3).props('outlined color=primary')
-        t_status = ui.select(STATUS_OPTIONS, value=STATUS_PENDING).classes(CLASS_WFULL_MB6).props('outlined')
+        if not statuses:
+            ui.label('Wait for Admin Update').classes('text-xl font-bold text-red-500 mb-4')
+            ui.label('No task statuses are currently defined by the administrator. Please wait for an admin update.').classes(CLASS_TEXT_GRAY_500_SM)
+            with ui.row().classes(CLASS_WFULL_JUSTIFY_END_GAP2):
+                ui.button('Close', on_click=dialog.close).props('flat color=primary')
+        else:
+            ui.label('Add Task Update').classes(CLASS_TEXT_XL_BOLD_MB4)
+            
+            t_title = ui.input('Task Title').classes(CLASS_WFULL_MB3).props('outlined color=primary')
+            t_desc = ui.textarea(DESC_TASK_DESCRIPTION).classes(CLASS_WFULL_MB3).props('outlined color=primary')
+            
+            status_options = {s.name: s.name for s in statuses}
+            t_status = ui.select(status_options, value=statuses[0].name).classes(CLASS_WFULL_MB6).props('outlined')
 
-        def save():
-            if not t_title.value:
-                ui.notify(MSG_TITLE_REQUIRED, type='warning')
-                return
-                
-            s_db = SessionLocal()
-            try:
-                ok, msg = add_task(
-                    db=s_db,
-                    employee_id=emp_id,
-                    title=t_title.value,
-                    description=t_desc.value,
-                    status=t_status.value
-                )
-                if ok:
-                    ui.notify(msg, type='positive')
-                    dialog.close()
-                    if callback:
-                        callback()
+            def save():
+                if not t_title.value:
+                    ui.notify(MSG_TITLE_REQUIRED, type='warning')
+                    return
+                    
+                s_db = SessionLocal()
+                try:
+                    ok, msg = add_task(
+                        db=s_db,
+                        employee_id=emp_id,
+                        title=t_title.value,
+                        description=t_desc.value,
+                        status=t_status.value
+                    )
+                    if ok:
+                        ui.notify(msg, type='positive')
+                        dialog.close()
+                        if callback:
+                            callback()
+                        else:
+                            ui.navigate.to(PATH_EMPLOYEE)
                     else:
-                        ui.navigate.to(PATH_EMPLOYEE)
-                else:
-                    ui.notify(msg, type='negative')
-            finally:
-                s_db.close()
+                        ui.notify(msg, type='negative')
+                finally:
+                    s_db.close()
 
-        with ui.row().classes(CLASS_WFULL_JUSTIFY_END_GAP2):
-            ui.button('Cancel', on_click=dialog.close).props('flat color=primary')
-            ui.button('Submit Task', on_click=save).classes('btn-neon')
+            with ui.row().classes(CLASS_WFULL_JUSTIFY_END_GAP2):
+                ui.button('Cancel', on_click=dialog.close).props('flat color=primary')
+                ui.button('Submit Task', on_click=save).classes('btn-neon')
     dialog.open()
 
 def open_edit_task_modal(row_data, callback=None):
     emp_id = app.storage.user.get('employee_id')
+    db = SessionLocal()
+    try:
+        statuses = db.query(TaskStatus).all()
+    finally:
+        db.close()
+
     with ui.dialog().classes(CLASS_WFULL_MAX_LG) as dialog, ui.card().classes(CLASS_GLASS_CARD_WFULL):
-        ui.label('Edit Task Update').classes(CLASS_TEXT_XL_BOLD_MB4)
-        
-        t_title = ui.input('Task Title', value=row_data['title']).classes(CLASS_WFULL_MB3).props('outlined color=primary')
-        t_desc = ui.textarea(DESC_TASK_DESCRIPTION, value=row_data['description']).classes(CLASS_WFULL_MB3).props('outlined color=primary')
-        t_status = ui.select(STATUS_OPTIONS, value=row_data['status']).classes(CLASS_WFULL_MB6).props('outlined')
+        if not statuses:
+            ui.label('Wait for Admin Update').classes('text-xl font-bold text-red-500 mb-4')
+            ui.label('No task statuses are currently defined by the administrator. Please wait for an admin update.').classes(CLASS_TEXT_GRAY_500_SM)
+            with ui.row().classes(CLASS_WFULL_JUSTIFY_END_GAP2):
+                ui.button('Close', on_click=dialog.close).props('flat color=primary')
+        else:
+            ui.label('Edit Task Update').classes(CLASS_TEXT_XL_BOLD_MB4)
+            
+            t_title = ui.input('Task Title', value=row_data['title']).classes(CLASS_WFULL_MB3).props('outlined color=primary')
+            t_desc = ui.textarea(DESC_TASK_DESCRIPTION, value=row_data['description']).classes(CLASS_WFULL_MB3).props('outlined color=primary')
+            
+            status_options = {s.name: s.name for s in statuses}
+            current_status = row_data['status']
+            if current_status not in status_options:
+                status_options[current_status] = current_status
+            t_status = ui.select(status_options, value=current_status).classes(CLASS_WFULL_MB6).props('outlined')
 
-        def save():
-            if not t_title.value:
-                ui.notify(MSG_TITLE_REQUIRED, type='warning')
-                return
-                
-            s_db = SessionLocal()
-            try:
-                ok, msg = update_task(
-                    db=s_db,
-                    employee_id=emp_id,
-                    task_id=row_data['task_id'],
-                    title=t_title.value,
-                    description=t_desc.value,
-                    status=t_status.value
-                )
-                if ok:
-                    ui.notify(msg, type='positive')
-                    dialog.close()
-                    if callback:
-                        callback()
-                else:
-                    ui.notify(msg, type='negative')
-            finally:
-                s_db.close()
+            def save():
+                if not t_title.value:
+                    ui.notify(MSG_TITLE_REQUIRED, type='warning')
+                    return
+                    
+                s_db = SessionLocal()
+                try:
+                    ok, msg = update_task(
+                        db=s_db,
+                        employee_id=emp_id,
+                        task_id=row_data['task_id'],
+                        title=t_title.value,
+                        description=t_desc.value,
+                        status=t_status.value
+                    )
+                    if ok:
+                        ui.notify(msg, type='positive')
+                        dialog.close()
+                        if callback:
+                            callback()
+                    else:
+                        ui.notify(msg, type='negative')
+                finally:
+                    s_db.close()
 
-        with ui.row().classes(CLASS_WFULL_JUSTIFY_END_GAP2):
-            ui.button('Cancel', on_click=dialog.close).props('flat color=primary')
-            ui.button('Update Task', on_click=save).classes('btn-neon')
+            with ui.row().classes(CLASS_WFULL_JUSTIFY_END_GAP2):
+                ui.button('Cancel', on_click=dialog.close).props('flat color=primary')
+                ui.button('Update Task', on_click=save).classes('btn-neon')
     dialog.open()
 
 
@@ -148,6 +180,11 @@ def employee_dashboard():
         # Fetch employee profile details
         emp_profile = get_employee_by_id(db, emp_id)
         
+        # Fetch task statuses
+        statuses = db.query(TaskStatus).all()
+        has_statuses = len(statuses) > 0
+        status_colors = {s.name: s.color for s in statuses}
+        
         # Fetch today's tasks
         today_tasks = db.query(Task).filter(
             Task.employee_id == emp_id,
@@ -155,9 +192,17 @@ def employee_dashboard():
         ).order_by(Task.created_time.desc()).all()
         
         today_count = len(today_tasks)
-        completed_count = sum(1 for t in today_tasks if t.status == STATUS_COMPLETED)
-        wip_count = sum(1 for t in today_tasks if t.status == STATUS_WIP)
-        pending_count = sum(1 for t in today_tasks if t.status == STATUS_PENDING)
+        completed_count = 0
+        wip_count = 0
+        pending_count = 0
+        for t in today_tasks:
+            status_lower = t.status.lower()
+            if 'completed' in status_lower:
+                completed_count += 1
+            elif 'wip' in status_lower or 'progress' in status_lower:
+                wip_count += 1
+            else:
+                pending_count += 1
         
         # This week's tasks count
         start_of_week = today - timedelta(days=today.weekday())
@@ -179,6 +224,7 @@ def employee_dashboard():
                 'title': t.title,
                 'description': t.description or 'No description provided.',
                 'status': t.status,
+                'status_color': status_colors.get(t.status, '#6b7280'),
                 'time': t.created_time.strftime(TIME_FORMAT_12H),
                 'last_modified': t.last_modified.strftime(TIME_FORMAT_12H)
             })
@@ -190,8 +236,16 @@ def employee_dashboard():
 
     # Render layout
     with render_layout(PATH_EMPLOYEE):
+        # Admin status alert if no statuses defined
+        if not has_statuses:
+            with ui.element('div').classes('w-full mb-6 p-6 rounded-xl bg-amber-50 border border-amber-200 flex flex-col gap-2'):
+                with ui.row().classes('items-center gap-3'):
+                    ui.element('i').classes('ri-alert-line text-amber-500 text-2xl')
+                    ui.label('Wait for admin update').classes('text-amber-900 font-bold text-lg')
+                ui.label('No task statuses are currently defined. Please wait for the administrator to update task statuses before you can submit tasks.').classes('text-amber-700 text-sm')
+
         # Reminder banner
-        if show_reminder:
+        if show_reminder and has_statuses:
             with ui.element('div').classes('w-full mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center justify-between'):
                 with ui.row().classes('items-center gap-3'):
                     ui.element('i').classes('ri-error-warning-fill text-red-500 text-2xl')
@@ -206,7 +260,10 @@ def employee_dashboard():
                 ui.label(f"Welcome, {emp_profile.employee_name}").classes('text-3xl font-bold tracking-tight')
                 ui.label('Log your updates and track daily goals').classes(CLASS_TEXT_GRAY_500_SM)
             
-            ui.button('Add Daily Task', icon='add_task', on_click=lambda: open_add_task_modal(callback=reload_page)).classes('btn-neon')
+            if has_statuses:
+                ui.button('Add Daily Task', icon='add_task', on_click=lambda: open_add_task_modal(callback=reload_page)).classes('btn-neon')
+            else:
+                ui.button('Add Daily Task', icon='add_task').classes('opacity-50 cursor-not-allowed').props('disabled')
 
         # Metric grid
         with ui.grid().classes('grid-cols-1 md:grid-cols-4 gap-6 mb-8 w-full'):
@@ -251,10 +308,10 @@ def employee_dashboard():
             table = ui.table(columns=columns, rows=rows, row_key='task_id').classes('w-full glass-card p-4').props('flat hide-bottom')
             
             # Render custom status chip
-            table.add_slot('body-cell-status', f'''
+            table.add_slot('body-cell-status', '''
                 <q-td :props="props">
-                    <span :class="'badge-status badge-' + (props.value === '{STATUS_COMPLETED}' ? 'completed' : props.value === '{STATUS_WIP}' ? 'wip' : props.value === '{STATUS_BLOCKED}' ? 'blocked' : props.value === '{STATUS_HOLD}' ? 'hold' : 'pending')">
-                        {{{{ props.value }}}}
+                    <span class="badge-status" :style="{ backgroundColor: props.row.status_color, color: '#fff', padding: '4px 12px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 'bold' }">
+                        {{ props.value }}
                     </span>
                 </q-td>
             ''')
@@ -286,6 +343,9 @@ def task_history():
     
     db = SessionLocal()
     try:
+        statuses = db.query(TaskStatus).all()
+        status_colors = {s.name: s.color for s in statuses}
+        
         tasks = get_employee_tasks(db, emp_id)
         events = get_calendar_events(db, emp_id)
         
@@ -298,6 +358,7 @@ def task_history():
                 'title': t.title,
                 'description': t.description or 'No description.',
                 'status': t.status,
+                'status_color': status_colors.get(t.status, '#6b7280'),
                 'is_today': t.created_date == date.today()
             })
     finally:
@@ -331,14 +392,11 @@ def task_history():
                             'last_month': 'Last 30 Days'
                         }, value='all').classes('w-48').props('outlined dense')
                         
-                        status_filter = ui.select({
-                            'All': 'All Statuses',
-                            STATUS_PENDING: STATUS_PENDING,
-                            STATUS_WIP: 'In Progress',
-                            STATUS_COMPLETED: STATUS_COMPLETED,
-                            STATUS_BLOCKED: STATUS_BLOCKED,
-                            STATUS_HOLD: STATUS_HOLD
-                        }, value='All').classes('w-48').props('outlined dense')
+                        status_filter_options = {'All': 'All Statuses'}
+                        for s in statuses:
+                            status_filter_options[s.name] = s.name
+                        
+                        status_filter = ui.select(status_filter_options, value='All').classes('w-48').props('outlined dense')
                         
                         query_input = ui.input(placeholder='Search tasks...').classes('w-64').props('outlined dense color=primary')
                         
@@ -368,6 +426,9 @@ def task_history():
                                 search_query=query_input.value.strip() if query_input.value else None
                             )
                             
+                            f_statuses = f_db.query(TaskStatus).all()
+                            f_status_colors = {s.name: s.color for s in f_statuses}
+                            
                             t_rows = []
                             for t in filtered:
                                 t_rows.append({
@@ -377,6 +438,7 @@ def task_history():
                                     'title': t.title,
                                     'description': t.description or 'No description.',
                                     'status': t.status,
+                                    'status_color': f_status_colors.get(t.status, '#6b7280'),
                                     'is_today': t.created_date == today
                                 })
                             table.rows = t_rows
@@ -402,10 +464,10 @@ def task_history():
                 table = ui.table(columns=columns, rows=rows, row_key='task_id').classes('w-full glass-card p-4').props('flat')
                 
                 # Custom chips for status
-                table.add_slot('body-cell-status', f'''
+                table.add_slot('body-cell-status', '''
                     <q-td :props="props">
-                        <span :class="'badge-status badge-' + (props.value === '{STATUS_COMPLETED}' ? 'completed' : props.value === '{STATUS_WIP}' ? 'wip' : props.value === '{STATUS_BLOCKED}' ? 'blocked' : props.value === '{STATUS_HOLD}' ? 'hold' : 'pending')">
-                            {{{{ props.value }}}}
+                        <span class="badge-status" :style="{ backgroundColor: props.row.status_color, color: '#fff', padding: '4px 12px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 'bold' }">
+                            {{ props.value }}
                         </span>
                     </q-td>
                 ''')

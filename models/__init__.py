@@ -23,6 +23,9 @@ engine = create_engine(DATABASE_URI, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# Import models to ensure they are registered with Base metadata
+from models.status import TaskStatus, EmployeeStatus
+
 
 def get_db():
     """Yield a database session and guarantee it is closed afterwards."""

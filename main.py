@@ -15,6 +15,7 @@ from models import Base, engine, SessionLocal
 from models.employee import Employee
 from models.task import Task
 from models.activity_log import ActivityLog
+from models.status import TaskStatus, EmployeeStatus
 from services.auth_service import hash_password
 
 from pages.login import init_login_routes
@@ -22,6 +23,8 @@ from pages.register import init_registration_routes
 from pages.admin import init_admin_routes
 from pages.employee import init_employee_routes
 from pages.reports import init_reports_routes
+from pages.masters import init_masters_routes
+from pages.daily_tasks import init_daily_tasks_routes
 
 from utils.logging_config import configure_logging
 from utils.error_pages import register_error_pages
@@ -64,6 +67,33 @@ def init_db():
             db.add(default_admin)
             db.commit()
             logger.info("Database seeded successfully.")
+
+        # Seed Task Statuses if empty
+        if db.query(TaskStatus).count() == 0:
+            logger.info("Seeding default task statuses...")
+            default_task_statuses = [
+                TaskStatus(name="Pending", description="Task has been created but not started", color="#eab308"),
+                TaskStatus(name="Work In Progress", description="Task is currently being worked on", color="#3b82f6"),
+                TaskStatus(name="Completed", description="Task has been successfully completed", color="#10b981"),
+                TaskStatus(name="Blocked", description="Task is blocked by dependency or issue", color="#ef4444"),
+                TaskStatus(name="On Hold", description="Task is temporarily suspended", color="#8b5cf6")
+            ]
+            db.add_all(default_task_statuses)
+            db.commit()
+            logger.info("Task statuses seeded successfully.")
+
+        # Seed Employee Statuses if empty
+        if db.query(EmployeeStatus).count() == 0:
+            logger.info("Seeding default employee statuses...")
+            default_emp_statuses = [
+                EmployeeStatus(name="active", description="Employee is active and working", color="#10b981"),
+                EmployeeStatus(name="inactive", description="Employee has left or is inactive", color="#ef4444"),
+                EmployeeStatus(name="On Leave", description="Employee is currently on approved leave", color="#f59e0b")
+            ]
+            db.add_all(default_emp_statuses)
+            db.commit()
+            logger.info("Employee statuses seeded successfully.")
+
     except Exception as e:
         logger.error("Error seeding database: %s", e)
         db.rollback()
@@ -119,6 +149,8 @@ init_registration_routes()
 init_admin_routes()
 init_employee_routes()
 init_reports_routes()
+init_masters_routes()
+init_daily_tasks_routes()
 
 # Root landing route redirection
 @ui.page('/')

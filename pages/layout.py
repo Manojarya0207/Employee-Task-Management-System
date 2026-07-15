@@ -25,15 +25,39 @@ def render_layout(active_route: str, action: str = None):
         <script>
             window.addEventListener('click', (event) => {
                 const button = event.target.closest('.btn-neon');
-                if (!button || button.classList.contains('is-loading')) return;
-                button.classList.add('is-loading');
-                window.setTimeout(() => button.classList.remove('is-loading'), 900);
+                if (button && !button.classList.contains('is-loading')) {
+                    button.classList.add('is-loading');
+                    window.setTimeout(() => button.classList.remove('is-loading'), 900);
+                }
+                
+                // Click outside mobile sidebar to close it
+                const sidebar = document.querySelector('.sidebar');
+                const topbar = document.querySelector('.mobile-topbar');
+                if (sidebar && sidebar.classList.contains('mobile-open') && topbar) {
+                    if (!sidebar.contains(event.target) && !topbar.contains(event.target)) {
+                        sidebar.classList.remove('mobile-open');
+                    }
+                }
             });
+            function toggleMobileSidebar() {
+                const sidebar = document.querySelector('.sidebar');
+                if (sidebar) {
+                    sidebar.classList.toggle('mobile-open');
+                }
+            }
         </script>
     ''')
 
     user_name = app.storage.user.get('employee_name', 'User')
     user_role = app.storage.user.get('role', 'employee')
+
+    # Mobile Top Bar
+    with ui.row().classes('mobile-topbar w-full items-center justify-between p-4 bg-white border-b border-slate-200 hidden'):
+        with ui.row().classes('items-center gap-3'):
+            with ui.button(on_click=lambda: ui.run_javascript('toggleMobileSidebar()')).props('flat round color=primary'):
+                ui.element('i').classes('ri-menu-line text-2xl')
+            ui.label('TASKFLOW').classes('font-extrabold text-lg tracking-wider text-slate-800')
+        ui.label(user_name).classes('text-xs font-semibold text-slate-600')
 
     # 1. Sidebar Container
     with ui.element('div').classes('sidebar'):
@@ -63,6 +87,12 @@ def render_layout(active_route: str, action: str = None):
                 with ui.element('div').classes(f'menu-item {active_class}').on('click', lambda: ui.navigate.to('/admin')):
                     ui.element('i').classes('ri-dashboard-3-line text-lg')
                     ui.label('Dashboard').classes('text-sm font-medium flex-1')
+
+                # 1.5. Daily Tasks
+                daily_active = 'active' if active_route == '/admin/daily-tasks' else ''
+                with ui.element('div').classes(f'menu-item {daily_active}').on('click', lambda: ui.navigate.to('/admin/daily-tasks')):
+                    ui.element('i').classes('ri-calendar-todo-line text-lg')
+                    ui.label('Daily Tasks').classes('text-sm font-medium flex-1')
 
                 # 2. Employees Section (Collapsible)
                 emp_expanded = active_route == '/admin/employees'
@@ -101,7 +131,7 @@ def render_layout(active_route: str, action: str = None):
                     emp_header.on('click', lambda: toggle_submenu(emp_submenu, chevron))
 
                 # 3. Masters Section (Collapsible)
-                masters_expanded = active_route == '/admin/tasks'
+                masters_expanded = active_route.startswith('/admin/masters')
                 
                 with ui.element('div').classes('w-full') as masters_container:
                     with ui.element('div').classes('menu-parent').classes('expanded' if masters_expanded else '') as masters_header:
@@ -114,11 +144,17 @@ def render_layout(active_route: str, action: str = None):
                     submenu.set_visibility(masters_expanded)
 
                     with submenu:
-                        # Employee Tasks Status sub-menu item
-                        task_active = 'active' if active_route == '/admin/tasks' else ''
-                        with ui.element('div').classes(f'submenu-item {task_active}').on('click', lambda: ui.navigate.to('/admin/tasks')):
-                            ui.element('i').classes('ri-task-line text-base')
-                            ui.label('Employee Tasks Status').classes('text-xs font-medium flex-1')
+                        # Task Statuses master sub-menu item
+                        task_status_active = 'active' if active_route == '/admin/masters/task-statuses' else ''
+                        with ui.element('div').classes(f'submenu-item {task_status_active}').on('click', lambda: ui.navigate.to('/admin/masters/task-statuses')):
+                            ui.element('i').classes('ri-checkbox-multiple-line text-base')
+                            ui.label('Task Statuses').classes('text-xs font-medium flex-1')
+
+                        # Employee Statuses master sub-menu item
+                        emp_status_active = 'active' if active_route == '/admin/masters/employee-statuses' else ''
+                        with ui.element('div').classes(f'submenu-item {emp_status_active}').on('click', lambda: ui.navigate.to('/admin/masters/employee-statuses')):
+                            ui.element('i').classes('ri-user-settings-line text-base')
+                            ui.label('Employee Statuses').classes('text-xs font-medium flex-1')
                     
                     masters_header.on('click', lambda: toggle_submenu(submenu, chevron))
 
