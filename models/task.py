@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Date, Time, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
 from models import Base
@@ -15,7 +16,7 @@ class Task(Base):
     created_date = Column(Date, nullable=False, default=func.current_date())
     created_time = Column(Time, nullable=False, default=func.current_time())
     updated_time = Column(Time, nullable=True, onupdate=func.current_time())
-    last_modified = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    last_modified = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     # Relationships
     employee = relationship("Employee", back_populates="tasks")

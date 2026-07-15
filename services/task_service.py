@@ -34,7 +34,8 @@ def add_task(
             description=description.strip() if description else None,
             status=status,
             created_date=date.today(),
-            created_time=datetime.now().time()
+            created_time=datetime.now().time(),
+            last_modified=datetime.now()
         )
         db.add(new_task)
         db.commit()
@@ -76,6 +77,7 @@ def update_task(
         task.description = description.strip() if description else None
         task.status = status
         task.updated_time = datetime.now().time()
+        task.last_modified = datetime.now()
         
         db.commit()
         log_activity(db, employee_id, f"Updated task: {title[:30]}")

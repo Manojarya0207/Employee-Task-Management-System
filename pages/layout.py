@@ -83,11 +83,11 @@ def render_layout(active_route: str):
                                     f'display:inline-block;margin-left:auto">{_pending}</span>'
                                 )
                         
-                        # Employee Tasks sub-menu item
+                        # Employee Tasks Status sub-menu item
                         task_active = 'active' if active_route == '/admin/tasks' else ''
                         with ui.element('div').classes(f'submenu-item {task_active}').on('click', lambda: ui.navigate.to('/admin/tasks')):
                             ui.element('i').classes('ri-task-line text-base')
-                            ui.label('Employee Tasks').classes('text-xs font-medium flex-1')
+                            ui.label('Employee Tasks Status').classes('text-xs font-medium flex-1')
 
                     def toggle():
                         visible = not submenu.visible

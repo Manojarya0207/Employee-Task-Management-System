@@ -21,6 +21,9 @@ def configure_logging() -> logging.Logger:
     root = logging.getLogger()
     root.setLevel(LOG_LEVEL)
 
+    # Suppress verbose third-party logs
+    logging.getLogger("watchfiles").setLevel(logging.WARNING)
+
     # Avoid attaching duplicate handlers if called more than once (e.g. under
     # the auto-reloader).
     if not root.handlers:
