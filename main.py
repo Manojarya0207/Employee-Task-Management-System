@@ -29,6 +29,13 @@ from utils.db_migration import run_migrations
 
 from datetime import date
 
+# Route and Role Constants
+PATH_LOGIN = '/login'
+PATH_ADMIN = '/admin'
+PATH_EMPLOYEE = '/employee'
+ROLE_ADMIN = 'admin'
+ROLE_EMPLOYEE = 'employee'
+
 # Configure application-wide logging (console + rotating file).
 logger = configure_logging()
 
@@ -48,7 +55,7 @@ def init_db():
                 employee_name="System Administrator",
                 phone_number="9999999999",
                 password_hash=hash_password(DEFAULT_ADMIN_PASSWORD),
-                role="admin",
+                role=ROLE_ADMIN,
                 department="Management",
                 status="active",
                 joining_date=date.today(),
@@ -69,7 +76,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # Unrestricted path matches (NiceGUI internal paths, static files, login, and register)
-        unrestricted_prefixes = ('/login', '/register', '/_nicegui', '/static', '/favicon.ico')
+        unrestricted_prefixes = (PATH_LOGIN, '/register', '/_nicegui', '/static', '/favicon.ico')
         if any(path.startswith(prefix) for prefix in unrestricted_prefixes):
             return await call_next(request)
 
@@ -78,18 +85,18 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not session or not session.get('authenticated', False):
             # Remember path and redirect to login
             session['referrer_path'] = path
-            return RedirectResponse('/login')
+            return RedirectResponse(PATH_LOGIN)
 
         # Role-based Authorization check
-        role = session.get('role', 'employee')
+        role = session.get('role', ROLE_EMPLOYEE)
 
         # Block employees from accessing admin portals
-        if path.startswith('/admin') and role != 'admin':
-            return RedirectResponse('/employee')
+        if path.startswith(PATH_ADMIN) and role != ROLE_ADMIN:
+            return RedirectResponse(PATH_EMPLOYEE)
 
         # Block admins from accessing employee portals
-        if path.startswith('/employee') and role != 'employee':
-            return RedirectResponse('/admin')
+        if path.startswith(PATH_EMPLOYEE) and role != ROLE_EMPLOYEE:
+            return RedirectResponse(PATH_ADMIN)
 
         return await call_next(request)
 
@@ -118,15 +125,15 @@ init_reports_routes()
 def root_page():
     if app.storage.user.get('authenticated', False):
         role = app.storage.user.get('role')
-        ui.navigate.to('/admin' if role == 'admin' else '/employee')
+        ui.navigate.to(PATH_ADMIN if role == ROLE_ADMIN else PATH_EMPLOYEE)
     else:
-        ui.navigate.to('/login')
+        ui.navigate.to(PATH_LOGIN)
 
 # Logout route
 @ui.page('/logout')
 def logout_page():
     app.storage.user.clear()
-    ui.navigate.to('/login')
+    ui.navigate.to(PATH_LOGIN)
 
 if __name__ in {"__main__", "__mp_main__"}:
     # Host/port/secret all come from the environment (see config.py) so the same

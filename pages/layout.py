@@ -2,8 +2,17 @@ from nicegui import app, ui
 from models import SessionLocal
 from services.registration_service import count_pending_requests
 
+def toggle_submenu(submenu, chevron):
+    visible = not submenu.visible
+    submenu.set_visibility(visible)
+    chevron.classes(replace='ri-arrow-up-s-line text-base ml-auto' if visible else 'ri-arrow-down-s-line text-base ml-auto')
 
-def render_layout(active_route: str):
+def do_logout():
+    app.storage.user.clear()
+    ui.notify('Logged out successfully', type='positive')
+    ui.navigate.to('/login')
+
+def render_layout(active_route: str, action: str = None):
     """
     Renders the common sidebar layout and wraps page content.
     Returns the page container to append components to.
@@ -55,8 +64,44 @@ def render_layout(active_route: str):
                     ui.element('i').classes('ri-dashboard-3-line text-lg')
                     ui.label('Dashboard').classes('text-sm font-medium flex-1')
 
-                # 2. Masters Section (Collapsible)
-                masters_expanded = active_route in ('/admin/employees', '/admin/tasks')
+                # 2. Employees Section (Collapsible)
+                emp_expanded = active_route == '/admin/employees'
+                
+                with ui.element('div').classes('w-full') as emp_container:
+                    with ui.element('div').classes('menu-parent').classes('expanded' if emp_expanded else '') as emp_header:
+                        ui.element('i').classes('ri-group-line text-lg')
+                        ui.label('Employees').classes('text-sm font-medium flex-1')
+                        if _pending > 0:
+                            ui.html(
+                                f'<span style="'
+                                f'background:#ef4444;color:white;border-radius:999px;'
+                                f'font-size:0.65rem;font-weight:700;padding:1px 7px;'
+                                f'min-width:20px;text-align:center;line-height:18px;'
+                                f'display:inline-block;margin-right:8px">{_pending}</span>'
+                            )
+                        chevron_icon = 'ri-arrow-up-s-line' if emp_expanded else 'ri-arrow-down-s-line'
+                        chevron = ui.element('i').classes(f'{chevron_icon} text-base ml-auto')
+                    
+                    emp_submenu = ui.element('div').classes('submenu-container')
+                    emp_submenu.set_visibility(emp_expanded)
+
+                    with emp_submenu:
+                        # Employee List sub-menu item
+                        list_active = 'active' if (active_route == '/admin/employees' and action != 'add') else ''
+                        with ui.element('div').classes(f'submenu-item {list_active}').on('click', lambda: ui.navigate.to('/admin/employees')):
+                            ui.element('i').classes('ri-list-check text-base')
+                            ui.label('Employee List').classes('text-xs font-medium flex-1')
+                            
+                        # Add Employees sub-menu item
+                        add_active = 'active' if (active_route == '/admin/employees' and action == 'add') else ''
+                        with ui.element('div').classes(f'submenu-item {add_active}').on('click', lambda: ui.navigate.to('/admin/employees?action=add')):
+                            ui.element('i').classes('ri-user-add-line text-base')
+                            ui.label('Add Employees').classes('text-xs font-medium flex-1')
+                    
+                    emp_header.on('click', lambda: toggle_submenu(emp_submenu, chevron))
+
+                # 3. Masters Section (Collapsible)
+                masters_expanded = active_route == '/admin/tasks'
                 
                 with ui.element('div').classes('w-full') as masters_container:
                     with ui.element('div').classes('menu-parent').classes('expanded' if masters_expanded else '') as masters_header:
@@ -68,33 +113,14 @@ def render_layout(active_route: str):
                     submenu = ui.element('div').classes('submenu-container')
                     submenu.set_visibility(masters_expanded)
 
-                    # Employees sub-menu item
-                    emp_active = 'active' if active_route == '/admin/employees' else ''
                     with submenu:
-                        with ui.element('div').classes(f'submenu-item {emp_active}').on('click', lambda: ui.navigate.to('/admin/employees')):
-                            ui.element('i').classes('ri-group-line text-base')
-                            ui.label('Employees').classes('text-xs font-medium flex-1')
-                            if _pending > 0:
-                                ui.html(
-                                    f'<span style="'
-                                    f'background:#ef4444;color:white;border-radius:999px;'
-                                    f'font-size:0.65rem;font-weight:700;padding:1px 7px;'
-                                    f'min-width:20px;text-align:center;line-height:18px;'
-                                    f'display:inline-block;margin-left:auto">{_pending}</span>'
-                                )
-                        
                         # Employee Tasks Status sub-menu item
                         task_active = 'active' if active_route == '/admin/tasks' else ''
                         with ui.element('div').classes(f'submenu-item {task_active}').on('click', lambda: ui.navigate.to('/admin/tasks')):
                             ui.element('i').classes('ri-task-line text-base')
                             ui.label('Employee Tasks Status').classes('text-xs font-medium flex-1')
-
-                    def toggle():
-                        visible = not submenu.visible
-                        submenu.set_visibility(visible)
-                        chevron.classes(replace='ri-arrow-up-s-line text-base ml-auto' if visible else 'ri-arrow-down-s-line text-base ml-auto')
                     
-                    masters_header.on('click', toggle)
+                    masters_header.on('click', lambda: toggle_submenu(submenu, chevron))
 
                 # 3. Reports
                 rep_active = 'active' if active_route == '/admin/reports' else ''
@@ -117,11 +143,6 @@ def render_layout(active_route: str):
 
         # Logout Panel
         with ui.element('div').classes('mt-auto pt-4 border-t border-slate-200'):
-            def do_logout():
-                app.storage.user.clear()
-                ui.notify('Logged out successfully', type='positive')
-                ui.navigate.to('/login')
-
             with ui.element('div').classes('menu-item hover:text-red-600').on('click', do_logout):
                 ui.element('i').classes('ri-logout-box-r-line text-lg')
                 ui.label('Logout').classes('text-sm')

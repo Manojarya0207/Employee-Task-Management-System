@@ -34,17 +34,17 @@ def generate_employee_id(name: str, phone: str) -> str:
     Rules
     -----
     - Strip spaces from name, take first 4 characters, uppercase.
-    - Take last 4 digits from phone (digits only).
-    - Concatenate → e.g. "Manoj Arya" + "9876543210" → "MANO3210"
+    - Take first 4 digits from phone (digits only).
+    - Concatenate → e.g. "Manoj Arya" + "9876543210" → "MANO9876"
     - If name has fewer than 4 letters after stripping, use all available.
     """
     # Extract letters only (ignore spaces and punctuation)
     name_letters = re.sub(r'[^a-zA-Z]', '', name).upper()
     name_part = name_letters[:4] if len(name_letters) >= 4 else name_letters
 
-    # Extract digits only from phone, take last 4
+    # Extract digits only from phone, take first 4
     phone_digits = re.sub(r'\D', '', phone)
-    phone_part = phone_digits[-4:] if len(phone_digits) >= 4 else phone_digits
+    phone_part = phone_digits[:4] if len(phone_digits) >= 4 else phone_digits
 
     return f"{name_part}{phone_part}"
 
@@ -104,8 +104,8 @@ def register_employee(
     if len(clean_phone) != 10:
         return False, "Phone number must be exactly 10 digits.", None
 
-    if len(password) < 8:
-        return False, "Password must be at least 8 characters.", None
+    if len(password) < 6:
+        return False, "Password must be at least 6 characters.", None
 
     # --- Duplicate phone check ---
     phone_exists = db.query(Employee).filter(
