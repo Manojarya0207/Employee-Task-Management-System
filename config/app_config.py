@@ -7,6 +7,12 @@ codebase runs unchanged locally (SQLite) and on Render (PostgreSQL). A local
 """
 
 import os
+import time
+
+# Set timezone to Asia/Kolkata (IST) to ensure correct time on deployments like Render
+os.environ['TZ'] = 'Asia/Kolkata'
+if hasattr(time, 'tzset'):
+    time.tzset()
 
 from dotenv import load_dotenv
 

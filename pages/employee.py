@@ -21,6 +21,21 @@ def parse_time_string(val):
             return datetime.strptime(val, '%H:%M:%S').time()
 
 
+def parse_datetime_string(val):
+    if not val:
+        return None
+    if not isinstance(val, str):
+        return val
+    if '+' in val:
+        val = val.split('+')[0]
+    for fmt in ('%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S'):
+        try:
+            return datetime.strptime(val, fmt)
+        except ValueError:
+            continue
+    return None
+
+
 # Constants to avoid duplicated string literal smells
 STATUS_COMPLETED = 'Completed'
 STATUS_PENDING = 'Pending'
@@ -220,6 +235,19 @@ def employee_dashboard():
         for t in today_tasks:
             # Parse times safely
             t_time_parsed = parse_time_string(t['created_time'])
+            
+            # Format last modified time in 12-hour format
+            lm_val = t.get('last_modified')
+            lm_time_str = ''
+            if lm_val:
+                lm_dt = parse_datetime_string(lm_val)
+                if lm_dt:
+                    lm_time_str = lm_dt.strftime(TIME_FORMAT_12H)
+            
+            # Fallback to formatted created time if last_modified is missing
+            if not lm_time_str and t_time_parsed:
+                lm_time_str = t_time_parsed.strftime(TIME_FORMAT_12H) if hasattr(t_time_parsed, 'strftime') else str(t_time_parsed)
+
             rows.append({
                 'task_id': t['task_id'],
                 'title': t['title'],
@@ -227,7 +255,7 @@ def employee_dashboard():
                 'status': t['status'],
                 'status_color': status_colors.get(t['status'], '#6b7280'),
                 'time': t_time_parsed.strftime(TIME_FORMAT_12H) if hasattr(t_time_parsed, 'strftime') else str(t_time_parsed),
-                'last_modified': t['created_time']  # Placeholder for simple display
+                'last_modified': lm_time_str
             })
     finally:
         db.close()

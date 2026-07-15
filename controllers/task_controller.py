@@ -70,7 +70,8 @@ class TaskController:
                     "description": t.description,
                     "status": t.status,
                     "created_date": str(t.created_date),
-                    "created_time": str(t.created_time)
+                    "created_time": str(t.created_time),
+                    "last_modified": str(t.last_modified) if t.last_modified else None
                 }
                 for t in tasks
             ]
