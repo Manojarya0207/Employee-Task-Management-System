@@ -26,7 +26,7 @@ def init_reports_routes():
 
         with render_layout('/admin/reports'):
             # Header
-            with ui.row().classes('w-full items-center justify-between mb-8'):
+            with ui.row().classes('w-full items-center justify-between mb-8 responsive-page-header'):
                 with ui.element('div'):
                     ui.label('Analytics Reports').classes('text-slate-900 text-3xl font-bold tracking-tight')
                     ui.label('Filter, review, and export formatted worksheets and printable summaries').classes('text-gray-500 text-sm')
@@ -66,7 +66,7 @@ def init_reports_routes():
                     }, value='excel').classes('w-full').props('outlined')
 
                 # Custom Date Range selection (shown only if rep_type == 'custom')
-                date_row = ui.row().classes('w-full gap-6 items-center mb-6')
+                date_row = ui.row().classes('w-full gap-6 items-center mb-6 responsive-date-row')
                 
                 with date_row:
                     start_input = ui.input('Start Date (YYYY-MM-DD)', value=date.today().strftime('%Y-%m-%d')).classes('w-64').props('outlined dense color=primary')
@@ -145,5 +145,5 @@ def init_reports_routes():
                     finally:
                         db_session.close()
 
-                with ui.row().classes('w-full justify-end mt-4'):
+                with ui.row().classes('w-full justify-end mt-4 responsive-actions'):
                     ui.button('Generate & Export Report', icon='summarize', on_click=run_export).classes('btn-neon').props('size=lg')

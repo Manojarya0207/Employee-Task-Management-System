@@ -70,7 +70,7 @@ def view_daily_tasks():
 
     with render_layout('/admin/daily-tasks'):
         # Header
-        with ui.row().classes('w-full items-center justify-between mb-8'):
+        with ui.row().classes('w-full items-center justify-between mb-8 responsive-page-header'):
             with ui.element('div'):
                 ui.label("Today's Tasks").classes('text-3xl font-bold tracking-tight')
                 ui.label(f"Monitor employee tasks submitted today ({date.today().strftime('%B %d, %Y')})").classes('text-gray-500 text-sm')

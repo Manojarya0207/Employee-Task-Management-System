@@ -26,6 +26,15 @@ body {
     margin: 0;
     padding: 0;
     min-height: 100vh;
+    overflow-x: hidden;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+img, svg, canvas {
+    max-width: 100%;
 }
 
 /* Premium Card Panels */
@@ -108,6 +117,19 @@ body,
     gap: 12px;
     padding: 12px 8px;
     margin-bottom: 32px;
+}
+
+.sidebar-close-button {
+    display: none !important;
+    margin-left: auto;
+}
+
+.sidebar-backdrop {
+    display: none;
+}
+
+.mobile-topbar {
+    display: none;
 }
 
 .sidebar .brand-title,
@@ -247,8 +269,40 @@ body,
     box-sizing: border-box;
 }
 
+/* Shared responsive building blocks used by page headers and filter controls. */
+.responsive-page-header {
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.responsive-toolbar,
+.responsive-date-row,
+.responsive-actions {
+    flex-wrap: wrap;
+}
+
+.responsive-toolbar .q-field,
+.responsive-toolbar .q-btn,
+.responsive-date-row .q-field {
+    min-width: 0;
+}
+
+/* Keep dense data tables usable on narrow screens without squeezing columns. */
+.q-table__container {
+    max-width: 100%;
+}
+
+.q-table__middle {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.q-table {
+    min-width: 640px;
+}
+
 /* Responsive Layout */
-@media (max-width: 1024px) {
+@media (max-width: 1280px) {
     .mobile-topbar {
         display: flex !important;
         position: relative !important;
@@ -272,15 +326,145 @@ body,
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         z-index: 200 !important;
         box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+        overflow-y: auto;
+        padding-bottom: 18px;
     }
     .sidebar.mobile-open {
         transform: translateX(0);
+    }
+    .sidebar-close-button {
+        display: inline-flex !important;
+    }
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.42);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 0.25s ease, visibility 0.25s ease;
+        z-index: 190;
+    }
+    .sidebar-backdrop.visible {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
     }
     .main-wrapper {
         margin-left: 0 !important;
         width: 100vw !important;
         padding: 20px 16px 24px 16px !important;
         box-sizing: border-box;
+    }
+
+    .q-dialog__inner {
+        padding: 16px !important;
+    }
+
+    .q-dialog__inner > .q-card {
+        max-width: calc(100vw - 32px) !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .mobile-topbar {
+        position: sticky !important;
+        top: 0;
+        padding: 0 12px !important;
+    }
+
+    .mobile-topbar > :last-child {
+        max-width: 42vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .main-wrapper {
+        padding: 18px 12px 28px !important;
+    }
+
+    .responsive-page-header {
+        margin-bottom: 24px !important;
+        align-items: flex-start !important;
+    }
+
+    .responsive-page-header h1,
+    .responsive-page-header .text-3xl {
+        font-size: 1.65rem !important;
+        line-height: 2rem !important;
+    }
+
+    .responsive-page-header .text-sm {
+        line-height: 1.35rem;
+    }
+
+    .glass-card,
+    .dark-card {
+        border-radius: 10px;
+    }
+
+    .glass-card.p-6,
+    .dark-card.p-6 {
+        padding: 16px !important;
+    }
+
+    .glass-card.p-8,
+    .dark-card.p-8 {
+        padding: 20px !important;
+    }
+
+    .responsive-toolbar,
+    .responsive-date-row,
+    .responsive-actions {
+        width: 100%;
+        gap: 12px !important;
+        align-items: stretch !important;
+    }
+
+    .responsive-toolbar .q-field,
+    .responsive-toolbar .q-btn,
+    .responsive-date-row .q-field,
+    .responsive-actions .q-btn {
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+
+    .q-tabs {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .q-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .q-tab {
+        flex: 0 0 auto;
+        min-width: max-content;
+        padding: 0 12px;
+    }
+
+    .q-table {
+        min-width: 580px;
+        font-size: 0.8rem;
+    }
+
+    .q-table th,
+    .q-table td {
+        white-space: nowrap;
+        padding: 9px 10px !important;
+    }
+
+    .fc .fc-toolbar {
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+    }
+
+    .fc .fc-toolbar-title {
+        font-size: 1rem;
     }
 }
 

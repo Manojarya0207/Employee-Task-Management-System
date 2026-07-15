@@ -29,7 +29,7 @@ def render_master_page(model_class, page_title, page_subtitle, active_route):
 
     with render_layout(active_route):
         # Header
-        with ui.row().classes('w-full items-center justify-between mb-8'):
+        with ui.row().classes('w-full items-center justify-between mb-8 responsive-page-header'):
             with ui.element('div'):
                 ui.label(page_title).classes('text-3xl font-bold tracking-tight')
                 ui.label(page_subtitle).classes('text-gray-500 text-sm')

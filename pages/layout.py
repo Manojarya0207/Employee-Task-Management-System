@@ -30,21 +30,24 @@ def render_layout(active_route: str, action: str = None):
                     window.setTimeout(() => button.classList.remove('is-loading'), 900);
                 }
                 
-                // Click outside mobile sidebar to close it
-                const sidebar = document.querySelector('.sidebar');
-                const topbar = document.querySelector('.mobile-topbar');
-                if (sidebar && sidebar.classList.contains('mobile-open') && topbar) {
-                    if (!sidebar.contains(event.target) && !topbar.contains(event.target)) {
-                        sidebar.classList.remove('mobile-open');
-                    }
-                }
             });
+            function closeMobileSidebar() {
+                const sidebar = document.querySelector('.sidebar');
+                const backdrop = document.querySelector('.sidebar-backdrop');
+                if (sidebar) sidebar.classList.remove('mobile-open');
+                if (backdrop) backdrop.classList.remove('visible');
+            }
             function toggleMobileSidebar() {
                 const sidebar = document.querySelector('.sidebar');
+                const backdrop = document.querySelector('.sidebar-backdrop');
                 if (sidebar) {
                     sidebar.classList.toggle('mobile-open');
+                    if (backdrop) backdrop.classList.toggle('visible', sidebar.classList.contains('mobile-open'));
                 }
             }
+            window.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') closeMobileSidebar();
+            });
         </script>
     ''')
 
@@ -52,12 +55,14 @@ def render_layout(active_route: str, action: str = None):
     user_role = app.storage.user.get('role', 'employee')
 
     # Mobile Top Bar
-    with ui.row().classes('mobile-topbar w-full items-center justify-between p-4 bg-white border-b border-slate-200 hidden'):
+    with ui.row().classes('mobile-topbar w-full items-center justify-between p-4 bg-white border-b border-slate-200'):
         with ui.row().classes('items-center gap-3'):
             with ui.button(on_click=lambda: ui.run_javascript('toggleMobileSidebar()')).props('flat round color=primary'):
                 ui.element('i').classes('ri-menu-line text-2xl')
             ui.label('TASKFLOW').classes('font-extrabold text-lg tracking-wider text-slate-800')
         ui.label(user_name).classes('text-xs font-semibold text-slate-600')
+
+    ui.element('div').classes('sidebar-backdrop').on('click', lambda: ui.run_javascript('closeMobileSidebar()'))
 
     # 1. Sidebar Container
     with ui.element('div').classes('sidebar'):
@@ -65,6 +70,8 @@ def render_layout(active_route: str, action: str = None):
         with ui.element('div').classes('sidebar-brand'):
             ui.element('i').classes('ri-rocket-fill text-primary text-3xl')
             ui.label('TASKFLOW').classes('font-extrabold text-xl tracking-wider brand-title')
+            with ui.button(on_click=lambda: ui.run_javascript('closeMobileSidebar()')).classes('sidebar-close-button').props('flat round dense aria-label="Close navigation"'):
+                ui.element('i').classes('ri-close-line text-xl')
 
         # User Info Panel
         with ui.element('div').classes('user-panel mb-6 p-4 rounded-xl bg-slate-50 border border-slate-100'):

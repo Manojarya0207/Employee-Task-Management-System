@@ -26,8 +26,8 @@ PATH_EMPLOYEE_HISTORY = '/employee/history'
 
 CLASS_GLASS_CARD_METRIC = 'glass-card p-6 metric-card'
 CLASS_GLASS_CARD_WFULL = 'glass-card p-6 w-full'
-CLASS_WFULL_ITEMS_JUSTIFY_MB8 = 'w-full items-center justify-between mb-8'
-CLASS_WFULL_JUSTIFY_END_GAP2 = 'w-full justify-end mt-4 gap-2'
+CLASS_WFULL_ITEMS_JUSTIFY_MB8 = 'w-full items-center justify-between mb-8 responsive-page-header'
+CLASS_WFULL_JUSTIFY_END_GAP2 = 'w-full justify-end mt-4 gap-2 responsive-actions'
 CLASS_TEXT_GRAY_500_SM = 'text-gray-500 text-sm'
 CLASS_TEXT_GRAY_500_SM_BOLD = 'text-gray-500 text-sm font-semibold'
 CLASS_TEXT_GRAY_500_XS = 'text-gray-500 text-xs'
@@ -382,8 +382,8 @@ def task_history():
             # PANEL 1: LIST VIEW
             with ui.tab_panel(list_tab).classes('p-0 bg-transparent'):
                 # Filters
-                with ui.row().classes('w-full mb-6 items-center justify-between gap-4'):
-                    with ui.row().classes('items-center gap-3'):
+                with ui.row().classes('w-full mb-6 items-center justify-between gap-4 responsive-toolbar'):
+                    with ui.row().classes('items-center gap-3 responsive-toolbar'):
                         period_filter = ui.select({
                             'all': 'All History',
                             'today': 'Today Only',

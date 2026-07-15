@@ -36,8 +36,8 @@ ROLE_EMPLOYEE = 'employee'
 
 CLASS_GLASS_CARD_METRIC = 'glass-card p-6 metric-card'
 CLASS_GLASS_CARD_WFULL = 'glass-card p-6 w-full'
-CLASS_WFULL_ITEMS_JUSTIFY_MB8 = 'w-full items-center justify-between mb-8'
-CLASS_WFULL_JUSTIFY_END_GAP2 = 'w-full justify-end mt-4 gap-2'
+CLASS_WFULL_ITEMS_JUSTIFY_MB8 = 'w-full items-center justify-between mb-8 responsive-page-header'
+CLASS_WFULL_JUSTIFY_END_GAP2 = 'w-full justify-end mt-4 gap-2 responsive-actions'
 CLASS_TEXT_GRAY_500_SM = 'text-gray-500 text-sm'
 CLASS_TEXT_GRAY_500_SM_BOLD = 'text-gray-500 text-sm font-semibold'
 CLASS_TEXT_GRAY_500_XS_MT1 = 'text-gray-500 text-xs mt-1'
@@ -278,7 +278,7 @@ def employee_management(action: str = None):
     if action == 'add':
         with render_layout(PATH_ADMIN_EMPLOYEES, action=action):
             # Header
-            with ui.row().classes('w-full items-center justify-between mb-8'):
+            with ui.row().classes('w-full items-center justify-between mb-8 responsive-page-header'):
                 with ui.element('div'):
                     ui.label('Add New Employee').classes('text-3xl font-bold tracking-tight')
                     ui.label('Create a new employee user account and allocate department').classes('text-gray-500 text-sm')
@@ -596,7 +596,7 @@ def employee_management(action: str = None):
                             .props('color=positive flat dense')
         
         # Header
-        with ui.row().classes('w-full items-center justify-between mb-8'):
+        with ui.row().classes('w-full items-center justify-between mb-8 responsive-page-header'):
             with ui.element('div'):
                 ui.label('Employee Registry & Requests').classes('text-3xl font-bold tracking-tight')
                 ui.label('Manage staff credentials, department allocations, and registration requests').classes('text-gray-500 text-sm')
@@ -617,8 +617,8 @@ def employee_management(action: str = None):
             # ── Panel 1: Active Registry ─────────────────────────────────
             with ui.tab_panel('active').classes('p-0 bg-transparent'):
                 # Search bar & Add Button
-                with ui.row().classes('w-full mb-6 items-center justify-between'):
-                    with ui.row().classes('items-center gap-3'):
+                with ui.row().classes('w-full mb-6 items-center justify-between responsive-toolbar'):
+                    with ui.row().classes('items-center gap-3 responsive-toolbar'):
                         search_input = ui.input(placeholder='Search by ID, Name, Phone or Department...').classes('w-96').props('outlined dense color=primary')
                         
                         def run_search():
@@ -1041,7 +1041,7 @@ def view_all_tasks():
 
     with render_layout('/admin/tasks'):
         # Header
-        with ui.row().classes('w-full items-center justify-between mb-8'):
+        with ui.row().classes('w-full items-center justify-between mb-8 responsive-page-header'):
             with ui.element('div'):
                 ui.label('Employee Task Registry').classes('text-3xl font-bold tracking-tight')
                 ui.label('Monitor and search daily task logs submitted by staff').classes('text-gray-500 text-sm')
@@ -1163,6 +1163,5 @@ def view_all_tasks():
                 </span>
             </q-td>
         ''')
-
 
 
